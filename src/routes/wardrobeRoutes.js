@@ -281,9 +281,12 @@ router.get("/wardrobe/outfit-items", async (req, res) => {
       }
 
       // wardrobe_outfit_items tablosundan outfit'in öğelerini getir
+      // Şimdi pozisyon alanlarını da seçiyoruz
       const { data: outfitItems, error: outfitItemsError } = await supabase
         .from("wardrobe_outfit_items")
-        .select("*")
+        .select(
+          "*, item_id, position_x, position_y, scale, rotation, z_index, processed_image_url"
+        )
         .eq("outfit_id", outfitId);
 
       if (outfitItemsError) {
@@ -318,6 +321,20 @@ router.get("/wardrobe/outfit-items", async (req, res) => {
       console.log(
         `${outfitItems ? outfitItems.length : 0} adet outfit öğesi bulundu`
       );
+
+      // Konsola bulunan öğelerin pozisyon bilgilerini yazdır
+      if (outfitItems && outfitItems.length > 0) {
+        console.log("İlk öğenin pozisyon bilgileri:");
+        const firstItem = outfitItems[0];
+        console.log({
+          item_id: firstItem.item_id,
+          position_x: firstItem.position_x,
+          position_y: firstItem.position_y,
+          scale: firstItem.scale,
+          rotation: firstItem.rotation,
+          z_index: firstItem.z_index,
+        });
+      }
 
       return res.status(200).json({
         success: true,
@@ -1549,7 +1566,8 @@ router.put("/wardrobe/outfits/:id/rename", async (req, res) => {
 // Outfit'e yeni item ekleme endpoint'i
 router.post("/wardrobe/outfit-items", async (req, res) => {
   try {
-    const { outfitId, itemId } = req.body;
+    const { outfitId, itemId, positionX, positionY, scale, rotation, zIndex } =
+      req.body;
 
     if (!outfitId || !itemId) {
       return res.status(400).json({
@@ -1559,6 +1577,9 @@ router.post("/wardrobe/outfit-items", async (req, res) => {
     }
 
     console.log(`Outfit ID ${outfitId}'ye yeni item ekleniyor: ${itemId}`);
+    if (positionX !== undefined || positionY !== undefined) {
+      console.log(`Pozisyon bilgileri ile: X=${positionX}, Y=${positionY}`);
+    }
 
     // Önce bu kombinasyonun daha önce eklenip eklenmediğini kontrol et
     const { data: existingItems, error: checkError } = await supabase
@@ -1574,6 +1595,53 @@ router.post("/wardrobe/outfit-items", async (req, res) => {
     // Eğer zaten eklenmiş ise, başarılı yanıt dön (idempotent)
     if (existingItems && existingItems.length > 0) {
       console.log(`Bu item zaten outfit'e eklenmiş: ${itemId}`);
+
+      // Belki pozisyon bilgileri güncellenmek isteniyordur, güncelle
+      if (
+        positionX !== undefined ||
+        positionY !== undefined ||
+        scale !== undefined ||
+        rotation !== undefined ||
+        zIndex !== undefined
+      ) {
+        console.log("Mevcut item için pozisyon bilgileri güncelleniyor");
+
+        const updateData = {};
+        if (positionX !== undefined) updateData.position_x = positionX;
+        if (positionY !== undefined) updateData.position_y = positionY;
+        if (scale !== undefined) updateData.scale = scale;
+        if (rotation !== undefined) updateData.rotation = rotation;
+        if (zIndex !== undefined) updateData.z_index = zIndex;
+
+        // Boş update data kontrolü
+        if (Object.keys(updateData).length === 0) {
+          return res.status(200).json({
+            success: true,
+            message: "Bu item zaten outfit'e eklenmiş",
+            data: existingItems[0],
+          });
+        }
+
+        // Pozisyon bilgilerini güncelle
+        const { data: updatedItem, error: updateError } = await supabase
+          .from("wardrobe_outfit_items")
+          .update(updateData)
+          .eq("outfit_id", outfitId)
+          .eq("item_id", itemId)
+          .select();
+
+        if (updateError) {
+          console.error("Pozisyon güncelleme hatası:", updateError);
+          throw updateError;
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: "Item pozisyonu güncellendi",
+          data: updatedItem[0],
+        });
+      }
+
       return res.status(200).json({
         success: true,
         message: "Bu item zaten outfit'e eklenmiş",
@@ -1582,18 +1650,38 @@ router.post("/wardrobe/outfit-items", async (req, res) => {
     }
 
     // Yeni bir wardrobe_outfit_items kaydı oluştur
+    const insertData = {
+      outfit_id: outfitId,
+      item_id: itemId,
+    };
+
+    // Eğer pozisyon bilgileri verilmişse ekle
+    if (positionX !== undefined) insertData.position_x = positionX;
+    if (positionY !== undefined) insertData.position_y = positionY;
+    if (scale !== undefined) insertData.scale = scale;
+    if (rotation !== undefined) insertData.rotation = rotation;
+    if (zIndex !== undefined) insertData.z_index = zIndex;
+
     const { data, error } = await supabase
       .from("wardrobe_outfit_items")
-      .insert([
-        {
-          outfit_id: outfitId,
-          item_id: itemId,
-        },
-      ])
+      .insert([insertData])
       .select();
 
     if (error) {
       throw error;
+    }
+
+    // Outfit'in son güncelleme zamanını güncelle
+    try {
+      await supabase
+        .from("wardrobe_outfits")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", outfitId);
+    } catch (outfitUpdateError) {
+      console.error(
+        "Outfit son güncelleme zamanı güncellenemedi:",
+        outfitUpdateError
+      );
     }
 
     res.status(201).json({
@@ -1606,6 +1694,132 @@ router.post("/wardrobe/outfit-items", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Item outfit'e eklenirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
+// Outfit item'larının pozisyonlarını güncelleme endpoint'i
+router.put("/wardrobe/outfit-items/position", async (req, res) => {
+  try {
+    const { outfitId, itemPositions } = req.body;
+
+    if (!outfitId || !itemPositions || !Array.isArray(itemPositions)) {
+      return res.status(400).json({
+        success: false,
+        message: "Outfit ID ve item pozisyonları gerekli",
+        receivedData: { outfitId, itemPositionsType: typeof itemPositions },
+      });
+    }
+
+    console.log(`Outfit ID: ${outfitId} için pozisyon güncellemesi yapılıyor`);
+    console.log(
+      `Toplam ${itemPositions.length} adet item pozisyonu güncelleniyor`
+    );
+
+    // Başarıyla güncellenen itemların listesi
+    const updatedItems = [];
+    const failedItems = [];
+
+    // Her bir item pozisyonunu güncelle
+    for (const positionData of itemPositions) {
+      const { itemId, x, y, scale, rotation, zIndex } = positionData;
+
+      if (!itemId) {
+        console.log("itemId olmadan güncelleme atlandı");
+        continue;
+      }
+
+      try {
+        // Önce bu item'ın outfit'te olup olmadığını kontrol et
+        const { data: existingItems, error: checkError } = await supabase
+          .from("wardrobe_outfit_items")
+          .select("*")
+          .eq("outfit_id", outfitId)
+          .eq("item_id", itemId);
+
+        if (checkError) {
+          console.error(`Item ${itemId} kontrol hatası:`, checkError);
+          failedItems.push({ itemId, error: checkError.message });
+          continue;
+        }
+
+        if (!existingItems || existingItems.length === 0) {
+          console.log(
+            `Item ${itemId} outfit'te bulunamadı, güncelleme yapılmayacak`
+          );
+          failedItems.push({
+            itemId,
+            error: "Item outfit'te bulunamadı",
+          });
+          continue;
+        }
+
+        // Konum bilgilerini güncelle
+        const updateData = {};
+        if (x !== undefined) updateData.position_x = x;
+        if (y !== undefined) updateData.position_y = y;
+        if (scale !== undefined) updateData.scale = scale;
+        if (rotation !== undefined) updateData.rotation = rotation;
+        if (zIndex !== undefined) updateData.z_index = zIndex;
+
+        // Boş update isteği kontrol et
+        if (Object.keys(updateData).length === 0) {
+          console.log(`Item ${itemId} için güncellenecek veri yok`);
+          continue;
+        }
+
+        // Güncelleme işlemini yap
+        const { data: updatedData, error: updateError } = await supabase
+          .from("wardrobe_outfit_items")
+          .update(updateData)
+          .eq("outfit_id", outfitId)
+          .eq("item_id", itemId);
+
+        if (updateError) {
+          console.error(
+            `Item ${itemId} pozisyon güncelleme hatası:`,
+            updateError
+          );
+          failedItems.push({ itemId, error: updateError.message });
+        } else {
+          console.log(`Item ${itemId} pozisyonu başarıyla güncellendi`);
+          updatedItems.push({
+            itemId,
+            updated: true,
+            values: updateData,
+          });
+        }
+      } catch (itemError) {
+        console.error(`Item ${itemId} işleme hatası:`, itemError);
+        failedItems.push({ itemId, error: itemError.message });
+      }
+    }
+
+    // Outfit'in son güncelleme zamanını güncelle
+    try {
+      await supabase
+        .from("wardrobe_outfits")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", outfitId);
+    } catch (outfitUpdateError) {
+      console.error(
+        "Outfit son güncelleme zamanı güncellenemedi:",
+        outfitUpdateError
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `${updatedItems.length} adet item pozisyonu güncellendi, ${failedItems.length} adet başarısız`,
+      updatedItems,
+      failedItems: failedItems.length > 0 ? failedItems : undefined,
+    });
+  } catch (error) {
+    console.error("Item pozisyonları güncellenirken hata:", error);
+    res.status(500).json({
+      success: false,
+      message: "Item pozisyonları güncellenirken bir hata oluştu",
       error: error.message,
     });
   }
