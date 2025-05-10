@@ -889,15 +889,17 @@ router.post("/wardrobe/outfits/remove-background", async (req, res) => {
   try {
     const { outfitId, imageUrls } = req.body;
 
-    if (!outfitId || !imageUrls || !Array.isArray(imageUrls)) {
+    if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Geçersiz veriler. Outfit ID ve görsel URL'leri gerekli.",
+        message: "Geçersiz veriler. En az bir görsel URL'si gerekli.",
       });
     }
 
     console.log(
-      `Arkaplan kaldırma işlemi başlatılıyor. Outfit ID: ${outfitId}, Görsel Sayısı: ${imageUrls.length}`
+      `Arkaplan kaldırma işlemi başlatılıyor. ${
+        outfitId === "temp" ? "Ürün ekleme" : `Outfit ID: ${outfitId}`
+      }, Görsel Sayısı: ${imageUrls.length}`
     );
 
     // İşlenmiş resimlerin sonuçlarını saklamak için dizi
@@ -907,6 +909,24 @@ router.post("/wardrobe/outfits/remove-background", async (req, res) => {
     // Her bir görsel için arkaplan kaldırma işlemi yap
     for (const imageUrl of imageUrls) {
       try {
+        // URL kontrolü yap - sadece http veya https ile başlayan URL'leri kabul et
+        if (
+          !imageUrl.startsWith("http://") &&
+          !imageUrl.startsWith("https://")
+        ) {
+          console.log(`Geçersiz URL formatı: ${imageUrl.substring(0, 50)}...`);
+          failedImages.push({
+            originalUrl: imageUrl,
+            error:
+              "Geçersiz URL formatı. Sadece HTTP veya HTTPS URL'leri desteklenir.",
+          });
+          continue;
+        }
+
+        console.log(
+          `Arkaplan kaldırma işlemi başlıyor: ${imageUrl.substring(0, 50)}...`
+        );
+
         // Replicate API'ye istek at
         const response = await axios.post(
           "https://api.replicate.com/v1/predictions",
@@ -932,7 +952,7 @@ router.post("/wardrobe/outfits/remove-background", async (req, res) => {
         let predictionResult = response.data;
 
         // Status "succeeded" olana kadar veya maksimum deneme sayısına ulaşana kadar bekle
-        let maxAttempts = 10;
+        let maxAttempts = 15; // Daha uzun sürebilir, bu yüzden maksimum deneme sayısını arttırdık
         let attempts = 0;
 
         while (
@@ -978,7 +998,10 @@ router.post("/wardrobe/outfits/remove-background", async (req, res) => {
           });
         }
       } catch (error) {
-        console.error(`Görsel işleme hatası (${imageUrl}):`, error);
+        console.error(
+          `Görsel işleme hatası (${imageUrl.substring(0, 30)}...):`,
+          error
+        );
         failedImages.push({
           originalUrl: imageUrl,
           error: error.message || "API hatası",
@@ -1820,6 +1843,133 @@ router.put("/wardrobe/outfit-items/position", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Item pozisyonları güncellenirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
+// Geçici resim yükleme endpoint'i
+router.post(
+  "/wardrobe/upload-temp-image",
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      // Yüklenen dosya kontrolü
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Yüklenecek resim gerekli",
+        });
+      }
+
+      console.log(
+        "Geçici resim yükleme isteği geldi, dosya boyutu:",
+        req.file.size
+      );
+
+      // Benzersiz bir dosya adı oluştur
+      const fileExt = req.file.originalname.split(".").pop();
+      const fileName = `temp_${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(2, 15)}.${fileExt}`;
+
+      // Resmi wardrobes bucket'ına yükle
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("wardrobes")
+        .upload(fileName, req.file.buffer, {
+          contentType: req.file.mimetype,
+          cacheControl: "3600",
+        });
+
+      if (uploadError) {
+        console.error("Supabase'e resim yükleme hatası:", uploadError);
+        throw uploadError;
+      }
+
+      // Yüklenen resmin public URL'ini al
+      const { data: publicUrlData } = supabase.storage
+        .from("wardrobes")
+        .getPublicUrl(fileName);
+
+      const imageUrl = publicUrlData.publicUrl;
+      console.log("Resim başarıyla yüklendi, URL:", imageUrl);
+
+      // Başarılı yanıt dön
+      res.status(200).json({
+        success: true,
+        message: "Resim başarıyla yüklendi",
+        imageUrl: imageUrl,
+      });
+    } catch (error) {
+      console.error("Geçici resim yükleme hatası:", error);
+      res.status(500).json({
+        success: false,
+        message: "Resim yüklenirken bir hata oluştu",
+        error: error.message,
+      });
+    }
+  }
+);
+
+// Wardrobe öğesinin ismini güncelle endpoint'i
+router.put("/wardrobe/:id/rename", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { itemName } = req.body;
+
+    if (!id || !itemName) {
+      return res.status(400).json({
+        success: false,
+        message: "Ürün ID ve yeni isim gerekli",
+      });
+    }
+
+    console.log(
+      `Ürün yeniden adlandırma isteği. Ürün ID: ${id}, Yeni isim: ${itemName}`
+    );
+
+    // Önce mevcut öğeyi kontrol et
+    const { data: existingItem, error: fetchError } = await supabase
+      .from("wardrobe_items")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    if (!existingItem) {
+      return res.status(404).json({
+        success: false,
+        message: "Güncellenecek ürün bulunamadı",
+      });
+    }
+
+    // Öğeyi güncelle
+    const { data, error } = await supabase
+      .from("wardrobe_items")
+      .update({
+        item_name: itemName,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select();
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Ürün ismi başarıyla güncellendi",
+      data: data[0],
+    });
+  } catch (error) {
+    console.error("Wardrobe öğesi isim güncelleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Ürün ismi güncellenirken bir hata oluştu",
       error: error.message,
     });
   }
