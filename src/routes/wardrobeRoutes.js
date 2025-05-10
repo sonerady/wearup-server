@@ -1975,4 +1975,124 @@ router.put("/wardrobe/:id/rename", async (req, res) => {
   }
 });
 
+// Outfit cover görselini yükleyen endpoint
+router.post(
+  "/wardrobe/outfits/:id/cover",
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: "Outfit ID gerekli",
+        });
+      }
+
+      // Yüklenen dosya kontrolü
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Yüklenecek kapak görseli gerekli",
+        });
+      }
+
+      console.log(`Outfit ID: ${id} için kapak görseli yükleniyor...`);
+      console.log("Dosya boyutu:", req.file.size);
+
+      // Outfit'in var olduğunu kontrol et
+      const { data: existingOutfit, error: checkError } = await supabase
+        .from("wardrobe_outfits")
+        .select("id, outfit_cover_url")
+        .eq("id", id)
+        .single();
+
+      if (checkError) {
+        console.error("Outfit kontrol hatası:", checkError);
+        return res.status(404).json({
+          success: false,
+          message: "Outfit bulunamadı veya erişim hatası",
+          error: checkError.message,
+        });
+      }
+
+      // Benzersiz bir dosya adı oluştur
+      const fileExt = req.file.originalname.split(".").pop();
+      const fileName = `outfit_cover_url_${id}_${Date.now()}.${fileExt}`;
+
+      // Eğer daha önce bir cover görsel varsa, onu silmek için işaretleyelim
+      let oldFileName = null;
+      if (existingOutfit.outfit_cover_url) {
+        oldFileName = existingOutfit.outfit_cover_url.split("/").pop();
+        console.log(`Eski kapak görseli bulundu: ${oldFileName}`);
+      }
+
+      // Resmi covers bucket'ına yükle
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("covers")
+        .upload(fileName, req.file.buffer, {
+          contentType: req.file.mimetype,
+          cacheControl: "3600",
+        });
+
+      if (uploadError) {
+        console.error("Supabase'e kapak görseli yükleme hatası:", uploadError);
+        throw uploadError;
+      }
+
+      // Yüklenen resmin public URL'ini al
+      const { data: publicUrlData } = supabase.storage
+        .from("covers")
+        .getPublicUrl(fileName);
+
+      const imageUrl = publicUrlData.publicUrl;
+      console.log("Kapak görseli başarıyla yüklendi, URL:", imageUrl);
+
+      // Outfit'i güncelle - outfit_cover_url alanına yeni URL'i kaydet
+      const { data: updatedOutfit, error: updateError } = await supabase
+        .from("wardrobe_outfits")
+        .update({
+          outfit_cover_url: imageUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .select();
+
+      if (updateError) {
+        console.error("Outfit güncelleme hatası:", updateError);
+        throw updateError;
+      }
+
+      // Eğer eski bir kapak görseli varsa ve başarıyla güncellemişsek, eski görseli sil
+      if (oldFileName) {
+        try {
+          await supabase.storage.from("covers").remove([oldFileName]);
+          console.log(`Eski kapak görseli silindi: ${oldFileName}`);
+        } catch (deleteError) {
+          console.error("Eski kapak görseli silinirken hata:", deleteError);
+          // Bu hata kritik değil, işleme devam edebiliriz
+        }
+      }
+
+      // Başarılı yanıt dön
+      res.status(200).json({
+        success: true,
+        message: "Outfit kapak görseli başarıyla güncellendi",
+        data: {
+          id: id,
+          coverUrl: imageUrl,
+        },
+      });
+    } catch (error) {
+      console.error("Outfit kapak görseli güncelleme hatası:", error);
+      res.status(500).json({
+        success: false,
+        message: "Outfit kapak görseli güncellenirken bir hata oluştu",
+        error: error.message,
+      });
+    }
+  }
+);
+
 module.exports = router;
