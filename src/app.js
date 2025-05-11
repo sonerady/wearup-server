@@ -46,6 +46,7 @@ const pinterestRoutes = require("./routes/pinterestRoutes");
 const inspirationsRoutes = require("./routes/inspirationsRoutes");
 const rankingsRoutes = require("./routes/rankings");
 const styleBattlesRoutes = require("./routes/styleBattles");
+const tournamentRoutes = require("./routes/tournamentRoutes");
 
 // Yeni eklenen route import'ları
 const userProfileRoutes = require("./routes/userProfileRoutes");
@@ -151,6 +152,7 @@ app.use("/api", styleBattlesRoutes);
 
 app.use("/api/style-battles", styleBattlesRoutes);
 app.use("/api/rankings", rankingsRoutes);
+app.use("/api/tournaments", tournamentRoutes);
 
 // RevenueCat webhook route ekle
 app.use("/revenuecat", revenuecatWebhookRouter);

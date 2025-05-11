@@ -168,9 +168,14 @@ router.get("/finished-battles", async (req, res) => {
 
 // Oy verme işlemi
 router.post("/vote", async (req, res) => {
-  const { userId, battleId, participantId } = req.body;
+  const { userId, battleId, participantId, voteCount = 1 } = req.body;
 
-  console.log("Received vote request:", { userId, battleId, participantId });
+  console.log("Received vote request:", {
+    userId,
+    battleId,
+    participantId,
+    voteCount,
+  });
 
   if (!userId || !battleId || !participantId) {
     return res.status(400).json({
@@ -178,6 +183,13 @@ router.post("/vote", async (req, res) => {
       message: "Missing required fields: userId, battleId, participantId",
     });
   }
+
+  // Oy sayısını numeric olarak doğrula
+  const votes = parseInt(voteCount) || 1;
+
+  // Makul bir üst limit koy (bir seferde gönderilecek oy sayısı için)
+  const maxVotesPerRequest = 100;
+  const finalVoteCount = Math.min(votes, maxVotesPerRequest);
 
   try {
     // İlgili katılımcıyı ve savaşı bul
@@ -262,10 +274,10 @@ router.post("/vote", async (req, res) => {
       throw voteError;
     }
 
-    // Katılımcının oylarını arttır
+    // Katılımcının oylarını birden fazla oy gönderildiyse o kadar arttır
     const { data: updateData, error: updateError } = await supabase
       .from("battle_participants")
-      .update({ votes: participant.votes + 1 })
+      .update({ votes: participant.votes + finalVoteCount })
       .eq("id", participantId);
 
     if (updateError) {
@@ -273,8 +285,8 @@ router.post("/vote", async (req, res) => {
       throw updateError;
     }
 
-    // Toplam oy sayısını arttır - rpc fonksiyonu yerine direkt güncelleme yapalım
-    const newTotalVotes = (battle.total_votes || 0) + 1;
+    // Toplam oy sayısını birden fazla oy gönderildiyse o kadar arttır
+    const newTotalVotes = (battle.total_votes || 0) + finalVoteCount;
     const { data: battleUpdateData, error: battleUpdateError } = await supabase
       .from("style_battles")
       .update({ total_votes: newTotalVotes })
@@ -285,10 +297,11 @@ router.post("/vote", async (req, res) => {
       throw battleUpdateError;
     }
 
-    console.log("Vote recorded successfully");
+    console.log(`Successfully recorded ${finalVoteCount} votes`);
     res.status(200).json({
       success: true,
-      message: "Vote recorded successfully",
+      message: `Successfully recorded ${finalVoteCount} votes`,
+      votesRecorded: finalVoteCount,
     });
   } catch (error) {
     console.error("Error voting for participant:", error);
