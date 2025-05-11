@@ -351,4 +351,83 @@ router.post("/vote", async (req, res) => {
   }
 });
 
+// Turnuvada bekleyen kullanıcıları getir (uygulama için gerçek-zamanlı değil, sadece görsel)
+router.get("/waiting-users", async (req, res) => {
+  try {
+    // Fake kullanıcı verileri oluştur
+    const waitingUsers = [
+      {
+        id: "fake-user-1",
+        username: "AyşeStyle",
+        avatar: "https://randomuser.me/api/portraits/women/12.jpg",
+        style_points: 3254,
+        waiting_since: "2 dakika",
+        outfit_image_url:
+          "https://fashionjournal.com.au/wp-content/uploads/2023/04/FJ-Denim-Trend-April-DemnaGvasalia.jpg",
+      },
+      {
+        id: "fake-user-2",
+        username: "ModaCı93",
+        avatar: "https://randomuser.me/api/portraits/men/22.jpg",
+        style_points: 2876,
+        waiting_since: "4 dakika",
+        outfit_image_url:
+          "https://assets.vogue.com/photos/5891f2bc186d7c1b6493c65a/master/w_2580%2Cc_limit/11-nigo-style.jpg",
+      },
+      {
+        id: "fake-user-3",
+        username: "StilKraliçesi",
+        avatar: "https://randomuser.me/api/portraits/women/32.jpg",
+        style_points: 4120,
+        waiting_since: "1 dakika",
+        outfit_image_url:
+          "https://images.squarespace-cdn.com/content/v1/5bd53306840b16657de21e14/1612472431158-9ZCQFXHLWL40CSIKXE76/street-style-london-calling-36-5fb40b45e08cc.jpg",
+      },
+      {
+        id: "fake-user-4",
+        username: "FashionKing",
+        avatar: "https://randomuser.me/api/portraits/men/45.jpg",
+        style_points: 3754,
+        waiting_since: "5 dakika",
+        outfit_image_url:
+          "https://s3-us-west-2.amazonaws.com/files.onset.freedom.co/joeybadass/uploads/2016/04/13193215/maxresdefault-1.jpg",
+      },
+      {
+        id: "fake-user-5",
+        username: "TrendSetter",
+        avatar: "https://randomuser.me/api/portraits/women/58.jpg",
+        style_points: 3985,
+        waiting_since: "3 dakika",
+        outfit_image_url:
+          "https://i.pinimg.com/originals/5c/7a/43/5c7a4310fc1ecf1fdd7b48ed957f165f.jpg",
+      },
+      {
+        id: "fake-user-6",
+        username: "VogueMan",
+        avatar: "https://randomuser.me/api/portraits/men/67.jpg",
+        style_points: 3121,
+        waiting_since: "7 dakika",
+        outfit_image_url:
+          "https://media.gq.com/photos/56bb54bba91b95ae55415aba/master/w_1600%2Cc_limit/Future.jpg",
+      },
+    ];
+
+    // Rastgele sırayla döndür
+    const shuffledUsers = [...waitingUsers].sort(() => 0.5 - Math.random());
+
+    return res.status(200).json({
+      success: true,
+      message: "Turnuvada bekleyen kullanıcılar",
+      waitingUsers: shuffledUsers.slice(0, 5), // Sadece 5 tanesini göster
+    });
+  } catch (error) {
+    console.error("Error getting waiting users:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error getting waiting users",
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;
