@@ -58,7 +58,6 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
     "bytes"
   );
 
-  // Force English language and US country to avoid Turkish prompt fragments
   const country = "us";
   const language = "en";
   console.log(`Parametreler: Ülke: ${country}, Dil: ${language}`);
@@ -87,7 +86,7 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
 
       // Use Gemini 1.5 Flash for analysis
       const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-pro-preview-05-06",
+        model: "gemini-1.5-flash",
       });
 
       // Prepare prompt for clothing item analysis
@@ -95,18 +94,18 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
         Analyze this image and identify all visible clothing items and accessories worn by the person.
         For each item provide:
         1. Category/type - Use the actual and specific product category name (NOT limited to fixed categories like Tops, Bottoms). Use the most accurate category name for what you see (e.g., "Shirt", "Jeans", "Sneakers", "Bracelet", "Sunglasses").
-        2. A detailed description in the "query" field in English with color, pattern, style and other notable features. Also include the gender association (male, female, or unisex) at the end of the query in parentheses.
+        2. A detailed description in the "query" field in English with color, pattern, style and other notable features. Also include the gender association (male, female, or unisex) at the end of the query. IMPORTANT: DO NOT use parentheses around the gender.
 
         Return the results as a JSON array of objects with exactly the following keys:
         [
-          { "type": "Shirt", "query": "blue striped button-up shirt (male)" },
-          { "type": "Jeans", "query": "distressed denim jeans (unisex)" },
-          { "type": "Boots", "query": "black leather boots (female)" },
-          { "type": "Ring", "query": "gold band ring (unisex)" },
-          { "type": "Cap", "query": "red baseball cap (male)" }
+          { "type": "Shirt", "query": "blue striped button-up shirt male" },
+          { "type": "Jeans", "query": "distressed denim jeans unisex" },
+          { "type": "Boots", "query": "black leather boots female" },
+          { "type": "Ring", "query": "gold band ring unisex" },
+          { "type": "Cap", "query": "red baseball cap male" }
         ]
 
-        Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" in English language including the gender in parentheses. IMPORTANT: DO NOT return any item without both fields properly filled.
+        Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" in English language including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
       `;
 
       console.log("Sending request to Gemini API...");
@@ -172,6 +171,9 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
           console.log("Filtering out incomplete item:", item);
           return false;
         }
+
+        // URL encode the query parameter to make it safe for API requests
+        item.query = encodeURIComponent(item.query);
         return true;
       });
 
@@ -289,7 +291,7 @@ router.post("/analyze-clothing-url", async (req, res) => {
 
     // Use Gemini 1.5 Flash for analysis
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-pro-preview-05-06",
+      model: "gemini-1.5-flash",
     });
 
     // Prepare prompt for clothing item analysis
@@ -297,18 +299,18 @@ router.post("/analyze-clothing-url", async (req, res) => {
       Analyze this image and identify all visible clothing items and accessories worn by the person.
       For each item provide:
       1. Category/type - Use the actual and specific product category name (NOT limited to fixed categories like Tops, Bottoms). Use the most accurate category name for what you see (e.g., "Shirt", "Jeans", "Sneakers", "Bracelet", "Sunglasses").
-      2. A detailed description in the "query" field in English with color, pattern, style and other notable features. Also include the gender association (male, female, or unisex) at the end of the query in parentheses.
+      2. A detailed description in the "query" field in English with color, pattern, style and other notable features. Also include the gender association (male, female, or unisex) at the end of the query. IMPORTANT: DO NOT use parentheses around the gender.
 
       Return the results as a JSON array of objects with exactly the following keys:
       [
-        { "type": "Shirt", "query": "blue striped button-up shirt (male)" },
-        { "type": "Jeans", "query": "distressed denim jeans (unisex)" },
-        { "type": "Boots", "query": "black leather boots (female)" },
-        { "type": "Ring", "query": "gold band ring (unisex)" },
-        { "type": "Cap", "query": "red baseball cap (male)" }
+        { "type": "Shirt", "query": "blue striped button-up shirt male" },
+        { "type": "Jeans", "query": "distressed denim jeans unisex" },
+        { "type": "Boots", "query": "black leather boots female" },
+        { "type": "Ring", "query": "gold band ring unisex" },
+        { "type": "Cap", "query": "red baseball cap male" }
       ]
 
-      Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" in English language including the gender in parentheses. IMPORTANT: DO NOT return any item without both fields properly filled.
+      Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" in English language including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
     `;
 
     console.log("Sending request to Gemini API...");
@@ -374,6 +376,9 @@ router.post("/analyze-clothing-url", async (req, res) => {
         console.log("Filtering out incomplete item:", item);
         return false;
       }
+
+      // URL encode the query parameter to make it safe for API requests
+      item.query = encodeURIComponent(item.query);
       return true;
     });
 
