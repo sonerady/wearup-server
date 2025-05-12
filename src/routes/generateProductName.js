@@ -1,5 +1,10 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage() });
+const fs = require("fs");
+const path = require("path");
+const { v4: uuidv4 } = require("uuid");
 
 // GoogleGenerativeAI kütüphanesini içe aktaralım
 const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -9,98 +14,208 @@ const apiKey = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(apiKey);
 
 /**
- * Giyim ürünü için isim oluşturma
+ * Giyim ürünü için AI analizi ve isim oluşturma
  * @route POST /generate-product-name
- * @param {object} req.body.attributes - Ürünün özellikleri (renk, tür, doku, vs.)
- * @returns {object} 200 - Oluşturulan ürün ismi
+ * @param {file} req.file - Analiz edilecek giyim ürününün fotoğrafı
+ * @returns {object} 200 - Analiz sonuçları (type ve query) ve oluşturulan ürün ismi
  */
-router.post("/generate-product-name", async (req, res) => {
-  try {
-    // API anahtarının mevcut olup olmadığını kontrol et
-    if (!apiKey) {
-      console.error("GEMINI_API_KEY ortam değişkenlerinde yapılandırılmamış");
-      return res.status(500).json({
-        success: false,
-        error: "Yapılandırma hatası",
-        message: "API anahtarı yapılandırılmamış",
-      });
-    }
+router.post(
+  "/generate-product-name",
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      // API anahtarının mevcut olup olmadığını kontrol et
+      if (!apiKey) {
+        console.error("GEMINI_API_KEY ortam değişkenlerinde yapılandırılmamış");
+        return res.status(500).json({
+          success: false,
+          error: "Yapılandırma hatası",
+          message: "API anahtarı yapılandırılmamış",
+        });
+      }
 
-    // İstek gövdesinden ürün özelliklerini al
-    const {
-      color = "",
-      type = "",
-      pattern = "",
-      material = "",
-      style = "",
-      gender = "",
-    } = req.body.attributes || {};
+      // Resim dosyasını kontrol et
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          error: "Geçersiz istek",
+          message: "Resim dosyası bulunamadı",
+        });
+      }
 
-    console.log("Alınan ürün özellikleri:", req.body.attributes);
+      // Geçici olarak resmi kaydet
+      const tempDir = path.join(__dirname, "../../../temp");
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
 
-    // Özellikleri birleştirerek bir tanımlama oluştur
-    const productDescription = [color, pattern, material, style, type, gender]
-      .filter((attr) => attr && attr.trim() !== "")
-      .join(" ");
+      const uniqueFilename = `${uuidv4()}.jpg`;
+      const tempFilePath = path.join(tempDir, uniqueFilename);
 
-    // Eğer hiçbir özellik verilmediyse hata döndür
-    if (!productDescription) {
-      return res.status(400).json({
-        success: false,
-        error: "Geçersiz istek",
-        message: "En az bir ürün özelliği belirtilmelidir",
-      });
-    }
+      fs.writeFileSync(tempFilePath, req.file.buffer);
+      const imageData = fs.readFileSync(tempFilePath, { encoding: "base64" });
 
-    // Gemini modeli (Gemini 1.5 Flash kullanılıyor)
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      // Gemini modeli (Gemini 1.5 Flash kullanılıyor)
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Prompt hazırlama
-    const prompt = `
-      Aşağıdaki özelliklere sahip bir giyim ürünü için yaratıcı ve çekici bir isim oluştur:
-      
-      Ürün özellikleri: ${productDescription}
-      
-      Lütfen şu kurallara uygun bir isim oluştur:
-      1. İsim 2-5 kelimeden oluşmalı
-      2. Tüm önemli özellikleri yansıtmalı
-      3. Çağdaş ve şık bir hissi olmalı
-      4. Yalnızca ismi döndür, başka açıklama ekleme
-      5. Türkçe olarak yanıt ver
-      
-      Şu formatta cevap ver:
-      İsim: [önerilen isim]
+      // Prompt hazırlama
+      const prompt = `
+      Analyze the clothing item visible in this photo.
+      Please identify the following information:
+      1. Clothing type/category (e.g., "T-shirt", "Pants", "Shirt", "Dress").
+      2. Distinctive features or a brief description of the item.
+      3. The main color(s) of the item.
+      4. Suitable seasons for the item (Return as a list like ["Summer", "Spring"] or ["All Seasons"]).
+      5. Relevant tags (Return as a comma-separated string like "casual, cotton, comfortable").
+      6. The material of the item (e.g., "Cotton", "Polyester", "Wool"). Always provide a best guess, do not state "Unknown".
+      7. The style of the item (e.g., "Casual", "Formal", "Sporty", "Vintage"). Always provide a best guess, do not state "Unknown".
+
+      Respond STRICTLY in the following JSON format:
+      {
+        "type": "product type/category",
+        "query": "brief description of the item",
+        "color": "main color(s)",
+        "seasons": ["season1", "season2"],
+        "tags": "tag1, tag2, tag3",
+        "material": "material",
+        "style": "style"
+      }
+
+      Respond only with the JSON object, do not add any other explanation or markdown formatting like \`\`\`json.
     `;
 
-    console.log("Gemini'ye gönderilen prompt:", prompt);
+      // İstek gönder (resimle birlikte)
+      const result = await model.generateContent({
+        contents: [
+          {
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: req.file.mimetype || "image/jpeg",
+                  data: imageData,
+                },
+              },
+            ],
+          },
+        ],
+      });
 
-    // İstek gönder
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text().trim();
+      const responseText = result.response.text().trim();
+      console.log("Gemini'den dönen yanıt:", responseText);
 
-    console.log("Gemini'den dönen yanıt:", responseText);
+      // JSON yanıtı ayrıştır
+      let analysisResult;
+      try {
+        // Markdown kod bloğu formatını temizle
+        let cleanJson = responseText;
+        // ```json ve ``` formatını temizle
+        cleanJson = cleanJson.replace(/^```json\s*/, "").replace(/\s*```$/, "");
+        // Satır başı/sonu boşlukları temizle
+        cleanJson = cleanJson.trim();
+        // Eğer hala geçerli JSON değilse, JSON içeriğini çıkarmayı dene
+        if (!cleanJson.startsWith("{") || !cleanJson.endsWith("}")) {
+          const jsonMatch = cleanJson.match(/{[\s\S]*}/);
+          if (jsonMatch) {
+            cleanJson = jsonMatch[0];
+          } else {
+            // JSON bulunamadıysa hata fırlat
+            throw new Error("Valid JSON object not found in the response.");
+          }
+        }
 
-    // Yanıtı ayrıştır ve sadece ismi al
-    let productName = responseText;
-    const match = responseText.match(/İsim:\s*(.+)/i);
-    if (match && match[1]) {
-      productName = match[1].trim();
+        analysisResult = JSON.parse(cleanJson);
+
+        // Eksik alanlar için varsayılan değerler ata
+        analysisResult.type = analysisResult.type || "Giyim Ürünü";
+        analysisResult.query = analysisResult.query || "Açıklama yok";
+        analysisResult.color = analysisResult.color || "Belirlenmedi";
+        analysisResult.seasons = Array.isArray(analysisResult.seasons)
+          ? analysisResult.seasons
+          : [];
+        analysisResult.tags = analysisResult.tags || "";
+        analysisResult.material = analysisResult.material || "Genel";
+        analysisResult.style = analysisResult.style || "Genel";
+      } catch (error) {
+        console.error("JSON ayrıştırma hatası veya eksik alanlar:", error);
+        console.error("Alınan Ham Yanıt:", responseText);
+        // JSON ayrıştırılamadıysa veya alanlar eksikse varsayılan değerleri kullan
+        analysisResult = {
+          type: "Giyim Ürünü",
+          query: "Açıklama yok",
+          color: "Belirlenmedi",
+          seasons: [],
+          tags: "",
+          material: "Genel",
+          style: "Genel",
+        };
+      }
+
+      // --- Mevsim ID Eşleştirmesi ve "Tüm Mevsimler" Mantığı ---
+      const SEASON_IDS = {
+        İlkbahar: "spring",
+        Yaz: "summer",
+        Sonbahar: "autumn",
+        Kış: "winter",
+      };
+      const ALL_SEASONS_IDENTIFIER = "Tüm Mevsimler";
+
+      let seasonIdsForApi = [];
+      const geminiSeasonNames = Array.isArray(analysisResult.seasons)
+        ? analysisResult.seasons
+        : []; // Gemini'den gelen dizi (güvenlik kontrolü)
+
+      if (geminiSeasonNames.includes(ALL_SEASONS_IDENTIFIER)) {
+        // Eğer "Tüm Mevsimler" geldiyse, tüm mevsim ID'lerini ekle
+        seasonIdsForApi = Object.values(SEASON_IDS);
+      } else {
+        // Aksi takdirde, gelen isimleri ID'lere çevir
+        seasonIdsForApi = geminiSeasonNames
+          .map((name) => SEASON_IDS[name]) // İsmi ID'ye çevir
+          .filter((id) => id); // Geçersiz isimlerden kaynaklanan null/undefined ID'leri filtrele
+      }
+      // ----------------------------------------------------------
+
+      // Ürün ismi olarak query alanını veya type + color kullanabiliriz.
+      // Şimdilik query'yi kullanalım. Gerekirse daha sonra değiştirilebilir.
+      const productName =
+        analysisResult.query ||
+        `${analysisResult.color} ${analysisResult.type}`;
+
+      // Geçici dosyayı temizle
+      fs.unlinkSync(tempFilePath);
+
+      // Başarılı yanıt döndür
+      return res.status(200).json({
+        success: true,
+        type: analysisResult.type,
+        query: analysisResult.query,
+        productName, // query'yi productName olarak kullanıyoruz
+        color: analysisResult.color,
+        seasons: seasonIdsForApi, // ID'leri gönder
+        tags: analysisResult.tags, // Virgülle ayrılmış string
+        material: analysisResult.material,
+        style: analysisResult.style,
+      });
+    } catch (error) {
+      console.error("Ürün analizi hatası:", error); // Hata mesajı güncellendi
+
+      // Geçici dosya oluşturulduysa silmeyi dene
+      if (fs.existsSync(tempFilePath)) {
+        try {
+          fs.unlinkSync(tempFilePath);
+        } catch (unlinkErr) {
+          console.error("Geçici dosya silinemedi:", unlinkErr);
+        }
+      }
+
+      return res.status(500).json({
+        success: false,
+        error: "İşlem hatası",
+        message: error.message || "Ürün analizi sırasında bir hata oluştu", // Mesaj güncellendi
+      });
     }
-
-    // Başarılı yanıt döndür
-    return res.status(200).json({
-      success: true,
-      productName,
-    });
-  } catch (error) {
-    console.error("Ürün ismi oluşturma hatası:", error);
-
-    return res.status(500).json({
-      success: false,
-      error: "İşlem hatası",
-      message: error.message || "Ürün ismi oluşturulurken bir hata oluştu",
-    });
   }
-});
+);
 
 module.exports = router;
