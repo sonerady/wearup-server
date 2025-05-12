@@ -30,12 +30,13 @@ router.get("/inspirations", async (req, res) => {
     const { page = 1, limit = 10, userId } = req.query;
     const offset = (page - 1) * limit;
 
+    // Şema uyumsuzluğunu ele almak için sorgu güncellendi - like_count > likes_count
     let query = supabase
       .from("inspirations")
       .select(
         `
         *,
-        likes: like_count,
+        likes: likes_count, 
         saves: save_count,
         comments: comment_count,
         views: view_count,
@@ -47,7 +48,39 @@ router.get("/inspirations", async (req, res) => {
 
     const { data, error, count } = await query;
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase sorgu hatası:", error);
+
+      // Hata durumunda alternatif sorgu deneyelim - sütun adlarını uyumsuz bırakalım
+      let fallbackQuery = supabase
+        .from("inspirations")
+        .select(
+          `
+          *,
+          user:user_id (id, username, avatar_url)
+        `
+        )
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      const fallbackResult = await fallbackQuery;
+
+      if (fallbackResult.error) {
+        throw fallbackResult.error;
+      }
+
+      // Eksik alanları ekle
+      const processedData = fallbackResult.data.map((post) => ({
+        ...post,
+        likes: post.likes_count || 0,
+        saves: post.save_count || 0,
+        comments: post.comment_count || 0,
+        views: post.view_count || 0,
+      }));
+
+      // İşlenmiş veriyi ata
+      data = processedData;
+    }
 
     // Eğer userId sağlanmışsa, kullanıcının beğendiği ve kaydettiği gönderileri işaretle
     if (userId) {
@@ -86,7 +119,7 @@ router.get("/inspirations", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Inspiration yüklenirken hata:", error);
+    console.error("Kullanıcı gönderileri alınırken hata:", error);
     res.status(500).json({
       success: false,
       message: "Inspiration gönderileri alınırken bir hata oluştu",
@@ -104,12 +137,13 @@ router.get("/inspirations/:id", async (req, res) => {
     // View count artırma (ziyaret)
     await supabase.rpc("increment_view_count", { post_id: id });
 
+    // Şema uyumsuzluğunu ele almak için sorgu güncellendi
     const { data, error } = await supabase
       .from("inspirations")
       .select(
         `
         *,
-        likes: like_count,
+        likes: likes_count,
         saves: save_count,
         comments: comment_count,
         views: view_count,
@@ -119,7 +153,35 @@ router.get("/inspirations/:id", async (req, res) => {
       .eq("id", id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Detay sorgu hatası:", error);
+
+      // Hata durumunda alternatif sorgu deneyelim
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("inspirations")
+        .select(
+          `
+          *,
+          user:user_id (id, username, avatar_url)
+        `
+        )
+        .eq("id", id)
+        .single();
+
+      if (fallbackError) throw fallbackError;
+
+      // Eksik alanları ekle
+      fallbackData.likes = fallbackData.likes_count || 0;
+      fallbackData.saves = fallbackData.save_count || 0;
+      fallbackData.comments = fallbackData.comment_count || 0;
+      fallbackData.views = fallbackData.view_count || 0;
+
+      // İşlenmiş veriyi döndür
+      return res.json({
+        success: true,
+        data: fallbackData,
+      });
+    }
 
     // Kullanıcının beğeni ve kaydetme durumunu kontrol et
     if (userId) {
@@ -705,88 +767,44 @@ router.get("/user/:userId/saved-inspirations", async (req, res) => {
 router.get("/user/:userId/inspirations", async (req, res) => {
   try {
     const { userId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    console.log(
-      `Kullanıcı gönderileri alınıyor - userId: ${userId}, page: ${page}, limit: ${limit}`
-    );
-
-    if (!userId) {
-      console.error("Kullanıcı ID'si eksik");
-      return res.status(400).json({
-        success: false,
-        message: "Kullanıcı kimliği gerekli",
-      });
-    }
-
-    // Kullanıcının varlığını kontrol et
-    const { data: userExists, error: userCheckError } = await supabase
-      .from("users")
-      .select("id")
-      .eq("id", userId)
-      .single();
-
-    if (userCheckError) {
-      console.error("Kullanıcı kontrol hatası:", userCheckError);
-      // Veritabanında kullanıcı bulunamadı ama devam et - belki sadece henüz paylaşım yapmamıştır
-    }
-
-    console.log(`Supabase'den kullanıcı postları sorgulanıyor: ${userId}`);
-
-    // İlişki hatasını önlemek için user:user_id kısmını çıkardık
-    const { data, error, count } = await supabase
+    // Foreign key ilişkisi hatası nedeniyle basitleştirilmiş sorgu kullanıyoruz
+    let query = supabase
       .from("inspirations")
-      .select(
-        `
-        id,
-        user_id,
-        image_url,
-        title,
-        caption,
-        like_count,
-        save_count,
-        comment_count,
-        view_count,
-        created_at
-      `,
-        { count: "exact" }
-      )
+      .select(`*`)
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
+    const { data, error, count } = await query;
+
     if (error) {
-      console.error("Supabase sorgu hatası:", error);
+      console.error("Kullanıcı gönderileri alınırken hata:", error);
       throw error;
     }
 
-    console.log(
-      `Bulunan gönderi sayısı: ${data ? data.length : 0} / ${count || 0}`
-    );
-
-    // Yanıta ekstra alanlar ekleyelim
-    const formattedData = data
-      ? data.map((item) => ({
-          ...item,
-          likes: item.like_count || 0,
-          saves: item.save_count || 0,
-          comments: item.comment_count || 0,
-          views: item.view_count || 0,
-          user: {
-            id: item.user_id,
-            username: "Kullanıcı", // Varsayılan username
-          },
-        }))
-      : [];
+    // İşlenmiş veriyi oluştur
+    const processedData = data.map((post) => ({
+      ...post,
+      likes: post.likes_count || post.like_count || 0,
+      saves: post.save_count || 0,
+      comments: post.comment_count || 0,
+      views: post.view_count || 0,
+      user: {
+        id: post.user_id,
+        username: "Kullanıcı", // Varsayılan değer
+      },
+    }));
 
     res.json({
       success: true,
-      data: formattedData,
+      data: processedData,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total: count || 0,
+        total: count || data.length,
       },
     });
   } catch (error) {

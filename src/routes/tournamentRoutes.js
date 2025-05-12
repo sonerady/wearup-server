@@ -9,29 +9,56 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Kullanıcıyı turnuva sırasına ekle
 router.post("/join", async (req, res) => {
-  const { userId, outfitImageUrl } = req.body;
+  const { userId, itemId, itemType, imageUrl } = req.body;
 
-  if (!userId || !outfitImageUrl) {
+  if (!userId || !imageUrl) {
     return res.status(400).json({
       success: false,
-      message: "Missing required fields: userId, outfitImageUrl",
+      message: "Missing required fields: userId and imageUrl",
     });
   }
 
   try {
+    // Özel durum: test kullanıcısı kontrolü
+    if (userId === "daf859e7-f3df-404b-bbbd-7fe9c60b40e4") {
+      console.log("Özel kullanıcı turnuva isteği: ", userId);
+    }
+
     // Kullanıcının zaten sırada olup olmadığını kontrol et
     const { data: existingQueue, error: queueCheckError } = await supabase
       .from("tournament_queue")
       .select("*")
-      .eq("user_id", userId)
-      .eq("status", "waiting");
+      .eq("user_id", userId);
 
     if (queueCheckError) throw queueCheckError;
 
     if (existingQueue && existingQueue.length > 0) {
-      return res.status(200).json({
-        success: true,
-        message: "You are already in the tournament queue",
+      // Zaten turnuvada olma durumunu detaylı açıkla
+      const queueStatus = existingQueue[0].status;
+      let statusMessage = "";
+
+      switch (queueStatus) {
+        case "waiting":
+          statusMessage = "Şu anda turnuva sırasında beklemektesiniz.";
+          break;
+        case "matched":
+          statusMessage = "Turnuva eşleşmesi bulundu, rakibiniz hazırlanıyor.";
+          break;
+        case "active":
+          statusMessage = "Aktif bir turnuva savaşınız devam ediyor.";
+          break;
+        case "completed":
+          statusMessage =
+            "Son turnuvanız tamamlandı, yeni bir turnuvaya katılabilirsiniz.";
+          break;
+        default:
+          statusMessage = "Zaten bir turnuvaya katıldınız.";
+      }
+
+      return res.status(409).json({
+        success: false,
+        code: "23505", // Duplicate key error kodu
+        message: statusMessage,
         queueId: existingQueue[0].id,
         status: existingQueue[0].status,
       });
@@ -48,38 +75,131 @@ router.post("/join", async (req, res) => {
     if (matchCheckError) throw matchCheckError;
 
     if (existingMatch && existingMatch.length > 0) {
-      return res.status(200).json({
-        success: true,
-        message: "You already have an active tournament match",
+      const matchStatus = existingMatch[0].status;
+      let matchMessage = "";
+
+      switch (matchStatus) {
+        case "pending":
+          matchMessage =
+            "Turnuva eşleşmeniz onay bekliyor, lütfen rakibinizi onaylayın.";
+          break;
+        case "active":
+          matchMessage = "Aktif bir turnuva savaşınız devam ediyor.";
+          break;
+        default:
+          matchMessage = "Devam eden bir turnuva eşleşmeniz bulunmaktadır.";
+      }
+
+      return res.status(409).json({
+        success: false,
+        code: "23505",
+        message: matchMessage,
         matchId: existingMatch[0].id,
         status: existingMatch[0].status,
       });
     }
 
-    // Kullanıcıyı sıraya ekle
-    const { data: queueData, error: queueError } = await supabase
-      .from("tournament_queue")
-      .insert([
-        {
-          user_id: userId,
-          outfit_image_url: outfitImageUrl,
-          status: "waiting",
-        },
-      ])
-      .select();
+    // Kullanıcıyı sıraya ekle - Bunu schema sorunlarına göre güncelle
+    try {
+      // Önce tablo yapısını kontrol et
+      const { data: columnInfo, error: columnError } = await supabase
+        .from("tournament_queue")
+        .select()
+        .limit(1);
 
-    if (queueError) throw queueError;
+      let insertData = {
+        user_id: userId,
+        outfit_image_url: imageUrl,
+        status: "waiting",
+      };
 
-    return res.status(201).json({
-      success: true,
-      message: "Successfully joined tournament queue",
-      queueId: queueData[0].id,
-    });
+      // item_id ve item_type sütunları sadece varsa ekle
+      if (!columnError && columnInfo) {
+        try {
+          // Şema doğrulaması için bir güvenli eklenecek alanlar listesi oluştur
+          const { error: testError } = await supabase
+            .from("tournament_queue")
+            .insert([
+              {
+                ...insertData,
+                item_id: itemId || null,
+                item_type: itemType || "outfit",
+              },
+            ])
+            .select();
+
+          if (!testError) {
+            // Başarılı olduysa, tam veri kümesini kullan
+            insertData = {
+              ...insertData,
+              item_id: itemId || null,
+              item_type: itemType || "outfit",
+            };
+          }
+        } catch (schemaError) {
+          console.log(
+            "Şema sorunu, item sütunları atlanıyor:",
+            schemaError.message
+          );
+          // Şema hatası nedeniyle item_id ve item_type alanlarını atla
+        }
+      }
+
+      // Kullanıcıyı sıraya ekle - Sadece geçerli alanlarla
+      const { data: queueData, error: queueError } = await supabase
+        .from("tournament_queue")
+        .insert([insertData])
+        .select();
+
+      if (queueError) {
+        // Özgün key hatası durumunda daha kullanıcı dostu mesaj
+        if (queueError.code === "23505") {
+          return res.status(409).json({
+            success: false,
+            code: "23505",
+            message:
+              "Zaten turnuva sırasındasınız. Yeni bir turnuvaya katılmadan önce mevcut turnuvanızı tamamlamalısınız.",
+            error: queueError.message,
+          });
+        }
+        throw queueError;
+      }
+
+      return res.status(201).json({
+        success: true,
+        message: "Turnuva sırasına başarıyla katıldınız.",
+        queueId: queueData[0].id,
+      });
+    } catch (insertError) {
+      console.error("SQL insert hatası:", insertError);
+
+      // Temel insert işlemi
+      const { data: basicQueueData, error: basicQueueError } = await supabase
+        .from("tournament_queue")
+        .insert([
+          {
+            user_id: userId,
+            outfit_image_url: imageUrl,
+            status: "waiting",
+          },
+        ])
+        .select();
+
+      if (basicQueueError) throw basicQueueError;
+
+      return res.status(201).json({
+        success: true,
+        message: "Turnuva sırasına başarıyla katıldınız (temel mod).",
+        queueId: basicQueueData[0].id,
+      });
+    }
   } catch (error) {
     console.error("Error joining tournament queue:", error);
     return res.status(500).json({
       success: false,
-      message: "Error joining tournament queue",
+      message: "Turnuva sırasına katılırken bir hata oluştu",
+      code: error.code,
+      detail: error.detail,
       error: error.message,
     });
   }
@@ -425,6 +545,160 @@ router.get("/waiting-users", async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Error getting waiting users",
+      error: error.message,
+    });
+  }
+});
+
+// Test kullanıcısı için turnuva verilerini temizle (SADECE GELİŞTİRME ORTAMINDA KULLANILMALI)
+router.delete("/clear-test-user/:userId", async (req, res) => {
+  const { userId } = req.params;
+
+  // Sadece belirli test kullanıcıları için izin ver
+  if (userId !== "daf859e7-f3df-404b-bbbd-7fe9c60b40e4") {
+    return res.status(403).json({
+      success: false,
+      message: "Bu işlem sadece test kullanıcıları için geçerlidir",
+    });
+  }
+
+  try {
+    console.log(`Test kullanıcısı turnuva verilerini temizleme: ${userId}`);
+
+    // İlk olarak, bu kullanıcının turnuva sırasında olup olmadığını kontrol et
+    const { data: queueEntries, error: queueError } = await supabase
+      .from("tournament_queue")
+      .select("id")
+      .eq("user_id", userId);
+
+    if (queueError) throw queueError;
+
+    // Kullanıcı hiç turnuvaya katılmadıysa
+    if (!queueEntries || queueEntries.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "Kullanıcı için silinecek turnuva verisi bulunamadı",
+      });
+    }
+
+    // Kullanıcının queue ID'lerini topla
+    const queueIds = queueEntries.map((entry) => entry.id);
+
+    // Önce ilişkili eşleşmeleri temizle
+    const { error: matchDeleteError } = await supabase
+      .from("tournament_matches")
+      .delete()
+      .or(
+        `user1_id.in.(${queueIds.join(",")}),user2_id.in.(${queueIds.join(
+          ","
+        )})`
+      );
+
+    if (matchDeleteError) throw matchDeleteError;
+
+    // Sonra queue kayıtlarını temizle
+    const { error: queueDeleteError } = await supabase
+      .from("tournament_queue")
+      .delete()
+      .eq("user_id", userId);
+
+    if (queueDeleteError) throw queueDeleteError;
+
+    return res.status(200).json({
+      success: true,
+      message: `${userId} kullanıcısı için turnuva verileri başarıyla temizlendi`,
+      deletedEntries: queueEntries.length,
+    });
+  } catch (error) {
+    console.error("Test kullanıcı verilerini temizlerken hata:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Turnuva verilerini temizlerken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
+// Kullanıcıyı turnuva sırasından çıkar
+router.post("/leave", async (req, res) => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: "Missing required field: userId",
+    });
+  }
+
+  try {
+    // Kullanıcının sırada olup olmadığını kontrol et
+    const { data: queueEntries, error: queueError } = await supabase
+      .from("tournament_queue")
+      .select("id, status") // status bilgisini de alalım
+      .eq("user_id", userId);
+
+    if (queueError) throw queueError;
+
+    // Kullanıcı sırada değilse veya hiç kayıt yoksa
+    if (!queueEntries || queueEntries.length === 0) {
+      return res.status(200).json({
+        success: true, // Hata değil, işlem yapılacak bir şey yok
+        message: "Kullanıcı zaten bir turnuva sırasında değil.",
+      });
+    }
+
+    // Aktif eşleşme durumunda turnuvadan çıkılmamalı (Bu kuralı koruyoruz)
+    const activeEntry = queueEntries.find((entry) => entry.status === "active");
+    if (activeEntry) {
+      return res.status(400).json({
+        success: false,
+        message: "Aktif bir turnuva devam ederken sıradan çıkamazsınız.",
+      });
+    }
+
+    // Kullanıcının queue ID'lerini topla (artık birden fazla olabilir, ama normalde tek olmalı)
+    const queueIds = queueEntries.map((entry) => entry.id);
+
+    // Önce ilişkili TÜM EŞLEŞMELERİ TEMİZLE (durumuna bakılmaksızın)
+    // Bu, takılı kalmış 'pending' veya 'completed' eşleşmeleri de temizler.
+    if (queueIds.length > 0) {
+      const { error: matchDeleteError } = await supabase
+        .from("tournament_matches")
+        .delete()
+        .or(
+          `user1_id.in.(${queueIds
+            .map((id) => `'${id}'`)
+            .join(",")}),user2_id.in.(${queueIds
+            .map((id) => `'${id}'`)
+            .join(",")})`
+        );
+
+      if (matchDeleteError) {
+        console.error("Error deleting associated matches:", matchDeleteError);
+        // Kritik bir hata değilse devam edebiliriz, en azından queue temizlensin
+      }
+    }
+
+    // Sonra TÜM queue kayıtlarını temizle (user_id ile eşleşen)
+    const { data: deletedData, error: queueDeleteError } = await supabase
+      .from("tournament_queue")
+      .delete()
+      .eq("user_id", userId) // user_id ile eşleşen tüm kayıtları sil
+      .select(); // Silinen kayıtları döndürsün (opsiyonel)
+
+    if (queueDeleteError) throw queueDeleteError;
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Turnuva sırasından ve ilişkili tüm eşleşmelerden başarıyla çıkıldı.",
+      deletedQueueEntries: deletedData ? deletedData.length : 0,
+    });
+  } catch (error) {
+    console.error("Turnuva sırasından çıkarken hata:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Turnuva sırasından çıkarken bir hata oluştu",
       error: error.message,
     });
   }

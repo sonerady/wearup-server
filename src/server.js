@@ -7,6 +7,7 @@ const dotenv = require("dotenv");
 const sharp = require("sharp");
 const webScrapingRouter = require("./routes/webScraping");
 const geminiImageDetectionRouter = require("./routes/geminiImageDetection");
+const generateProductNameRouter = require("./routes/generateProductName");
 
 dotenv.config();
 
@@ -25,6 +26,7 @@ app.use(express.static(path.join(__dirname, "../public")));
 // Route'ları kullan
 app.use("/api/web-scraping", webScrapingRouter);
 app.use("/api/image-detection", geminiImageDetectionRouter);
+app.use("/api", generateProductNameRouter);
 
 // Ana endpoint
 app.get("/", (req, res) => {
