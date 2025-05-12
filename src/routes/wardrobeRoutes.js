@@ -434,6 +434,7 @@ router.post("/wardrobe", upload.single("image"), async (req, res) => {
       itemName,
       category,
       purchaseDate,
+      purchasePrice,
       seasons: typeof seasons === "string" ? JSON.parse(seasons) : seasons,
     });
 
@@ -488,6 +489,21 @@ router.post("/wardrobe", upload.single("image"), async (req, res) => {
       }
     }
 
+    // Boş string olan sayısal değerleri null'a çevir
+    const processedPurchasePrice =
+      purchasePrice === "" || purchasePrice === undefined
+        ? null
+        : purchasePrice;
+    const processedPurchaseDate =
+      purchaseDate === "" || purchaseDate === undefined ? null : purchaseDate;
+
+    console.log("İşlenmiş fiyat ve tarih değerleri:", {
+      originalPrice: purchasePrice,
+      processedPrice: processedPurchasePrice,
+      originalDate: purchaseDate,
+      processedDate: processedPurchaseDate,
+    });
+
     // Doğrudan SQL sorgusu ile veri ekleyelim - Bu RLS'i by-pass edecek
     const { data, error } = await supabase.rpc("insert_wardrobe_item", {
       p_user_id: userId,
@@ -498,8 +514,8 @@ router.post("/wardrobe", upload.single("image"), async (req, res) => {
       p_notes: notes,
       p_link_address: linkAddress,
       p_item_size: itemSize,
-      p_purchase_price: purchasePrice,
-      p_purchase_date: purchaseDate,
+      p_purchase_price: processedPurchasePrice, // Düzeltilmiş: boş string yerine null
+      p_purchase_date: processedPurchaseDate, // Düzeltilmiş: boş string yerine null
       p_tags: parsedTags,
       p_visibility: visibility,
       p_image_url: imageUrl,
@@ -525,8 +541,8 @@ router.post("/wardrobe", upload.single("image"), async (req, res) => {
             notes: notes,
             link_address: linkAddress,
             item_size: itemSize,
-            purchase_price: purchasePrice,
-            purchase_date: purchaseDate,
+            purchase_price: processedPurchasePrice, // Düzeltilmiş: boş string yerine null
+            purchase_date: processedPurchaseDate, // Düzeltilmiş: boş string yerine null
             tags: parsedTags,
             visibility: visibility,
             image_url: imageUrl,
@@ -2090,6 +2106,268 @@ router.post(
         success: false,
         message: "Outfit kapak görseli güncellenirken bir hata oluştu",
         error: error.message,
+      });
+    }
+  }
+);
+
+// Çoklu ürün ekleme endpoint'i
+router.post(
+  "/wardrobe/add-multiple",
+  upload.array("images"),
+  async (req, res) => {
+    try {
+      const { items } = req.body;
+      let parsedItems = [];
+
+      // items string olarak geldiyse parse et
+      if (typeof items === "string") {
+        try {
+          parsedItems = JSON.parse(items);
+        } catch (e) {
+          console.error("JSON parse hatası:", e);
+          return res.status(400).json({
+            success: false,
+            message: "Geçersiz JSON formatı",
+            error: e.message,
+          });
+        }
+      } else {
+        parsedItems = items;
+      }
+
+      console.log("Gelen veriler:", req.body);
+      console.log("Items türü:", typeof items);
+      console.log(
+        "Ayrıştırılmış öğeler:",
+        parsedItems ? parsedItems.length : 0
+      );
+
+      if (
+        !parsedItems ||
+        !Array.isArray(parsedItems) ||
+        parsedItems.length === 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Eklenecek ürünler gerekli",
+          receivedBody: req.body,
+        });
+      }
+
+      const results = [];
+      const errors = [];
+
+      // Her bir ürün için ayrı işlem yap
+      for (let i = 0; i < parsedItems.length; i++) {
+        try {
+          const item = parsedItems[i];
+
+          const {
+            userId,
+            itemName,
+            category,
+            seasons,
+            color,
+            notes,
+            linkAddress,
+            itemSize,
+            purchasePrice,
+            purchaseDate,
+            tags,
+            visibility,
+            processedImageUri, // İşlenmiş resim URL'si
+          } = item;
+
+          console.log(`Ürün ${i + 1} işleniyor:`, {
+            userId,
+            itemName,
+            category,
+            purchasePrice,
+            purchaseDate,
+          });
+
+          if (!userId || !itemName || !category) {
+            errors.push({
+              index: i,
+              error: "Kullanıcı ID, ürün adı ve kategori zorunludur",
+              data: { userId, itemName, category },
+            });
+            continue;
+          }
+
+          console.log(`Ürün ${i + 1} kaydediliyor:`, itemName);
+
+          // Boş stringler için null kontrolleri - Kesin olarak null'a çevir
+          const processedPurchasePrice =
+            purchasePrice === "" ||
+            purchasePrice === undefined ||
+            purchasePrice === null
+              ? null
+              : purchasePrice;
+          const processedPurchaseDate =
+            purchaseDate === "" ||
+            purchaseDate === undefined ||
+            purchaseDate === null
+              ? null
+              : purchaseDate;
+
+          console.log(`Ürün ${i + 1} işlenmiş değerleri:`, {
+            originalPrice: purchasePrice,
+            processedPrice: processedPurchasePrice,
+            originalDate: purchaseDate,
+            processedDate: processedPurchaseDate,
+          });
+
+          // Seasons ve tags verilerini kontrol et
+          let parsedSeasons = [];
+          if (seasons) {
+            try {
+              parsedSeasons = Array.isArray(seasons)
+                ? seasons
+                : JSON.parse(seasons);
+            } catch (error) {
+              console.error("Mevsim verisi ayrıştırma hatası:", error);
+              parsedSeasons = [];
+            }
+          }
+
+          let parsedTags = [];
+          if (tags) {
+            try {
+              parsedTags = Array.isArray(tags) ? tags : JSON.parse(tags);
+            } catch (error) {
+              console.error("Etiket verisi ayrıştırma hatası:", error);
+              parsedTags = [];
+            }
+          }
+
+          // Veritabanı parametre nesnesi - Yazılması daha kolay olsun diye
+          const dbParams = {
+            p_user_id: userId,
+            p_item_name: itemName,
+            p_category: category,
+            p_seasons: parsedSeasons,
+            p_color: color || null,
+            p_notes: notes || null,
+            p_link_address: linkAddress || null,
+            p_item_size: itemSize || null,
+            p_purchase_price: processedPurchasePrice, // Düzeltilmiş fiyat
+            p_purchase_date: processedPurchaseDate, // Düzeltilmiş tarih
+            p_tags: parsedTags,
+            p_visibility: visibility || "private",
+            p_image_url: processedImageUri || null,
+          };
+
+          console.log(`Ürün ${i + 1} için DB parametreleri:`, dbParams);
+
+          // RPC fonksiyonu ile veri ekle
+          const { data, error } = await supabase.rpc(
+            "insert_wardrobe_item",
+            dbParams
+          );
+
+          if (error) {
+            console.error(`Ürün ${i + 1} kaydedilirken hata:`, error);
+
+            // RLS hatası veya diğer bir hata durumunda direkt insert dene
+            if (
+              error.message.includes("row-level security policy") ||
+              error.code === "42501"
+            ) {
+              console.log(`Ürün ${i + 1} için direkt insert deneniyor...`);
+
+              const insertData = {
+                user_id: userId,
+                item_name: itemName,
+                category: category,
+                seasons: parsedSeasons,
+                color: color || null,
+                notes: notes || null,
+                link_address: linkAddress || null,
+                item_size: itemSize || null,
+                purchase_price: processedPurchasePrice, // Düzeltilmiş fiyat
+                purchase_date: processedPurchaseDate, // Düzeltilmiş tarih
+                tags: parsedTags,
+                visibility: visibility || "private",
+                image_url: processedImageUri || null,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              };
+
+              console.log(`Ürün ${i + 1} için insert verisi:`, insertData);
+
+              const { data: sqlData, error: sqlError } = await supabase
+                .from("wardrobe_items")
+                .insert(insertData)
+                .select("*");
+
+              if (sqlError) {
+                console.error(
+                  `Ürün ${i + 1} için SQL sorgusu başarısız:`,
+                  sqlError
+                );
+                errors.push({
+                  index: i,
+                  error: sqlError.message,
+                  code: sqlError.code,
+                  details: sqlError.details,
+                });
+                continue;
+              }
+
+              results.push({
+                index: i,
+                success: true,
+                method: "direct-insert",
+                data: sqlData[0],
+              });
+              continue;
+            }
+
+            errors.push({
+              index: i,
+              error: error.message,
+              code: error.code,
+              details: error.details,
+            });
+            continue;
+          }
+
+          console.log(`Ürün ${i + 1} başarıyla kaydedildi`);
+          results.push({
+            index: i,
+            success: true,
+            method: "rpc",
+            data: data[0],
+          });
+        } catch (itemError) {
+          console.error(`Ürün ${i + 1} kaydedilirken genel hata:`, itemError);
+          errors.push({
+            index: i,
+            error: itemError.message,
+            stack: itemError.stack,
+          });
+        }
+      }
+
+      // Sonuçları gönder
+      res.status(200).json({
+        success: errors.length === 0 || results.length > 0,
+        message: `${results.length} ürün başarıyla eklendi, ${errors.length} ürün eklenirken hata oluştu`,
+        results,
+        errors: errors.length > 0 ? errors : undefined,
+      });
+    } catch (error) {
+      console.error("Çoklu ürün ekleme hatası:", error);
+      console.error("Hata yığını:", error.stack);
+      console.error("Request body:", req.body);
+
+      res.status(500).json({
+        success: false,
+        message: "Ürünler eklenirken bir hata oluştu",
+        error: error.message,
+        stack: error.stack,
       });
     }
   }
