@@ -193,6 +193,7 @@ router.post(
       const ALL_SEASONS_IDENTIFIER = "Tüm Mevsimler";
 
       let seasonIdsForApi = [];
+      let seasonNamesForFrontend = [];
       const geminiSeasonNames = Array.isArray(analysisResult.seasons)
         ? analysisResult.seasons
         : []; // Gemini'den gelen dizi (güvenlik kontrolü)
@@ -200,11 +201,19 @@ router.post(
       if (geminiSeasonNames.includes(ALL_SEASONS_IDENTIFIER)) {
         // Eğer "Tüm Mevsimler" geldiyse, tüm mevsim ID'lerini ekle
         seasonIdsForApi = Object.values(SEASON_IDS);
+        seasonNamesForFrontend = ["Tüm Mevsimler"];
       } else {
         // Aksi takdirde, gelen isimleri ID'lere çevir
         seasonIdsForApi = geminiSeasonNames
           .map((name) => SEASON_IDS[name]) // İsmi ID'ye çevir
           .filter((id) => id); // Geçersiz isimlerden kaynaklanan null/undefined ID'leri filtrele
+
+        // Frontend için doğrudan Türkçe mevsim isimlerini kullan
+        seasonNamesForFrontend = geminiSeasonNames.filter(
+          (name) =>
+            Object.keys(SEASON_IDS).includes(name) ||
+            name === ALL_SEASONS_IDENTIFIER
+        );
       }
       // ----------------------------------------------------------
 
@@ -224,7 +233,8 @@ router.post(
         query: analysisResult.query,
         productName, // query'yi productName olarak kullanıyoruz
         color: analysisResult.color,
-        seasons: seasonIdsForApi, // ID'leri gönder
+        seasons: seasonNamesForFrontend, // Frontend için Türkçe isimleri gönder
+        seasonsIds: seasonIdsForApi, // Arka plan için ID'leri de sakla
         tags: analysisResult.tags, // Virgülle ayrılmış string
         material: analysisResult.material,
         style: analysisResult.style,
