@@ -62,23 +62,53 @@ router.post(
       const prompt = `
       Analyze the clothing item visible in this photo.
       Please identify the following information:
-      1. Clothing type/category (e.g., "T-shirt", "Pants", "Shirt", "Dress").
+      1. Clothing type/category - Select the most appropriate category ID from this list:
+         - "1": "Tişört" (T-shirt)
+         - "2": "Jean" (Jeans)
+         - "3": "Elbise" (Dress)
+         - "4": "Sneaker"
+         - "5": "Gömlek" (Shirt)
+         - "6": "Sweatshirt"
+         - "7": "Mont" (Coat/Jacket)
+         - "8": "Kazak" (Sweater)
+         - "9": "Şort" (Shorts)
+         - "10": "Ceket" (Jacket)
+         - "11": "Çanta" (Bag)
+         - "12": "Pantolon" (Pants/Trousers)
+         - "13": "Ayakkabı" (Shoes)
+         - "14": "Etek" (Skirt)
+         - "15": "Takı" (Jewelry)
+         - "16": "Bluz" (Blouse)
+         - "17": "Polo Tişört" (Polo Shirt)
+         - "18": "Atlet" (Tank Top/Sleeveless)
+         - "19": "Hırka" (Cardigan)
+         - "20": "Yelek" (Vest)
+         - "21": "Kapüşonlu" (Hooded)
+         - "22": "Uzun Kollu" (Long Sleeve)
+         - "23": "Crop Top"
+         - "24": "Kot Pantolon" (Jeans)
+         - "25": "Kumaş Pantolon" (Fabric Pants)
+         - "26": "Eşofman" (Sweatpants)
+         - "27": "Tayt" (Leggings)
+         
       2. Distinctive features or a brief description of the item.
       3. The main color(s) of the item.
-      4. Suitable seasons for the item (Return as a list like ["Summer", "Spring"] or ["All Seasons"]).
+      4. Suitable seasons for the item (Return as a list like ["İlkbahar", "Yaz"] or ["Tüm Mevsimler"]).
       5. Relevant tags (Return as a comma-separated string like "casual, cotton, comfortable").
       6. The material of the item (e.g., "Cotton", "Polyester", "Wool"). Always provide a best guess, do not state "Unknown".
       7. The style of the item (e.g., "Casual", "Formal", "Sporty", "Vintage"). Always provide a best guess, do not state "Unknown".
+      8. The gender category the item belongs to. ONLY return one of these exact values: "men", "women", "unisex", "kids". Do not use any other values.
 
       Respond STRICTLY in the following JSON format:
       {
-        "type": "product type/category",
+        "type": "ONLY RETURN THE NUMERIC ID as a string, e.g. '1' or '12', etc.",
         "query": "brief description of the item",
         "color": "main color(s)",
         "seasons": ["season1", "season2"],
         "tags": "tag1, tag2, tag3",
         "material": "material",
-        "style": "style"
+        "style": "style",
+        "gender": "gender"
       }
 
       Respond only with the JSON object, do not add any other explanation or markdown formatting like \`\`\`json.
@@ -136,6 +166,7 @@ router.post(
         analysisResult.tags = analysisResult.tags || "";
         analysisResult.material = analysisResult.material || "Genel";
         analysisResult.style = analysisResult.style || "Genel";
+        analysisResult.gender = analysisResult.gender || "Unisex";
       } catch (error) {
         console.error("JSON ayrıştırma hatası veya eksik alanlar:", error);
         console.error("Alınan Ham Yanıt:", responseText);
@@ -148,6 +179,7 @@ router.post(
           tags: "",
           material: "Genel",
           style: "Genel",
+          gender: "Unisex",
         };
       }
 
@@ -196,6 +228,7 @@ router.post(
         tags: analysisResult.tags, // Virgülle ayrılmış string
         material: analysisResult.material,
         style: analysisResult.style,
+        gender: analysisResult.gender,
       });
     } catch (error) {
       console.error("Ürün analizi hatası:", error); // Hata mesajı güncellendi
