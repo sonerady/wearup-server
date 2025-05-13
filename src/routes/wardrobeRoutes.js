@@ -169,6 +169,11 @@ router.get("/wardrobe/latest", async (req, res) => {
   try {
     const userId = req.query.userId;
 
+    // Yeni: pagination parametreleri (varsayılan 6'şar)
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 6;
+    const offset = (page - 1) * limit;
+
     if (!userId) {
       return res.status(400).json({
         success: false,
@@ -177,11 +182,12 @@ router.get("/wardrobe/latest", async (req, res) => {
     }
 
     // En yeni öğeler en üstte olacak şekilde Supabase'den verileri çek
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from("wardrobe_items")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("user_id", userId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
 
     if (error) {
       throw error;
@@ -190,6 +196,11 @@ router.get("/wardrobe/latest", async (req, res) => {
     res.status(200).json({
       success: true,
       data: data,
+      pagination: {
+        page,
+        limit,
+        total: count,
+      },
     });
   } catch (error) {
     console.error("Wardrobe öğeleri getirme hatası:", error);
@@ -205,6 +216,10 @@ router.get("/wardrobe/latest", async (req, res) => {
 router.get("/wardrobe/outfits", async (req, res) => {
   try {
     const userId = req.query.userId;
+    // Pagination parametreleri
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 6;
+    const offset = (page - 1) * limit;
     console.log("userIdddd", userId);
 
     if (!userId) {
@@ -248,12 +263,17 @@ router.get("/wardrobe/outfits", async (req, res) => {
         });
       }
 
-      // Önce wardrobe_outfits tablosundan kullanıcının outfitlerini getir
-      const { data: outfits, error: outfitsError } = await supabase
+      // Önce wardrobe_outfits tablosundan kullanıcının outfitlerini getir (sayfalı)
+      const {
+        data: outfits,
+        error: outfitsError,
+        count,
+      } = await supabase
         .from("wardrobe_outfits")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("user_id", userId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
 
       if (outfitsError) {
         console.error("Outfitler getirilirken hata:", outfitsError);
@@ -323,6 +343,11 @@ router.get("/wardrobe/outfits", async (req, res) => {
       return res.status(200).json({
         success: true,
         data: outfits || [],
+        pagination: {
+          page,
+          limit,
+          total: count,
+        },
       });
     } catch (dbError) {
       console.error("Veritabanı sorgusu sırasında hata:", dbError);
