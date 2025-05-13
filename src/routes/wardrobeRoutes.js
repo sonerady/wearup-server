@@ -12,6 +12,122 @@ dotenv.config();
 // Replicate API token'ı al
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 
+// Replicate URL'yi Supabase'e yükleyip yeni URL döndüren yardımcı fonksiyon
+const uploadReplicateUrlToSupabase = async (replicateUrl) => {
+  try {
+    if (!replicateUrl) {
+      console.log("Resim URL'si boş veya tanımsız!");
+      return null;
+    }
+
+    console.log("======= REPLICATE URL İŞLEME BAŞLADI =======");
+    console.log("Gelen URL:", replicateUrl);
+    console.log("URL tipi:", typeof replicateUrl);
+
+    // URL formatını doğrula
+    if (!replicateUrl.startsWith("http")) {
+      console.error("Geçersiz URL formatı! HTTP ile başlamıyor:", replicateUrl);
+      return null;
+    }
+
+    console.log(
+      "Replicate URL'yi Supabase'e yükleme başlatılıyor:",
+      replicateUrl
+    );
+
+    // Önce URL'nin daha önce işlenip işlenmediğini kontrol et
+    if (
+      replicateUrl.includes("wardrobes") &&
+      replicateUrl.includes("supabase")
+    ) {
+      console.log(
+        "Bu URL zaten Supabase'e yüklenmiş, doğrudan kullanılıyor:",
+        replicateUrl
+      );
+      return replicateUrl;
+    }
+
+    // Replicate URL'den resmi fetch et
+    console.log("Resim indirme işlemi başlatılıyor...");
+    const response = await fetch(replicateUrl, {
+      method: "GET",
+      headers: {
+        Accept: "image/*",
+      },
+      timeout: 10000, // 10 saniye timeout
+    });
+
+    if (!response.ok) {
+      console.error(
+        `Resim indirme başarısız! HTTP ${response.status}: ${response.statusText}`
+      );
+      return replicateUrl; // Hata durumunda orijinal URL'yi döndür
+    }
+
+    console.log("Resim başarıyla indirildi, buffer'a dönüştürülüyor...");
+
+    // Resmi buffer olarak al
+    const imageBuffer = await response.arrayBuffer();
+    console.log("Buffer boyutu:", imageBuffer.byteLength, "bytes");
+
+    if (imageBuffer.byteLength === 0) {
+      console.error("İndirilen resim boş (0 byte)!");
+      return replicateUrl;
+    }
+
+    // Dosya adı oluştur
+    const fileExt = "png"; // Replicate genellikle PNG döndürür
+    const fileName = `wardrobe_replicate_${Date.now()}_${Math.random()
+      .toString(36)
+      .substring(2, 15)}.${fileExt}`;
+
+    console.log("Oluşturulan dosya adı:", fileName);
+    console.log("Supabase storage yükleme işlemi başlatılıyor...");
+
+    // Resmi wardrobes bucket'ına yükle
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("wardrobes")
+      .upload(fileName, imageBuffer, {
+        contentType: "image/png",
+        cacheControl: "3600",
+      });
+
+    if (uploadError) {
+      console.error("Supabase'e replicate resmi yükleme hatası:", uploadError);
+      console.error("Hata detayları:", JSON.stringify(uploadError));
+      return replicateUrl; // Hata durumunda orijinal URL'yi döndür
+    }
+
+    console.log("Supabase'e yükleme başarılı, public URL alınıyor...");
+
+    // Yüklenen resmin public URL'ini al
+    const { data: publicUrlData } = supabase.storage
+      .from("wardrobes")
+      .getPublicUrl(fileName);
+
+    if (!publicUrlData || !publicUrlData.publicUrl) {
+      console.error("Public URL alınamadı:", publicUrlData);
+      return replicateUrl; // URL alınamazsa orijinal URL'yi döndür
+    }
+
+    const supabaseImageUrl = publicUrlData.publicUrl;
+    console.log(
+      "Replicate resmi Supabase'e yüklendi, yeni URL:",
+      supabaseImageUrl
+    );
+    console.log("======= REPLICATE URL İŞLEME TAMAMLANDI =======");
+
+    return supabaseImageUrl;
+  } catch (error) {
+    console.error("====== REPLICATE RESMİ YÜKLEME HATASI ======");
+    console.error("Hata:", error);
+    console.error("Hata mesajı:", error.message);
+    console.error("Hata stack:", error.stack);
+    console.error("Orijinal URL:", replicateUrl);
+    return replicateUrl; // Hata durumunda orijinal URL'yi döndür
+  }
+};
+
 // Tüm wardrobe öğelerini getir
 router.get("/wardrobe", async (req, res) => {
   try {
@@ -449,30 +565,95 @@ router.post("/wardrobe", upload.single("image"), async (req, res) => {
 
     // Eğer resim yüklendiyse Supabase'e yükle
     if (req.file) {
-      const fileExt = req.file.originalname.split(".").pop();
-      const fileName = `${Date.now()}_${Math.random()
-        .toString(36)
-        .substring(2, 15)}.${fileExt}`;
+      try {
+        const fileExt = req.file.originalname.split(".").pop();
+        const fileName = `${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(2, 15)}.${fileExt}`;
 
-      // Resmi wardrobes bucket'ına yükle
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("wardrobes")
-        .upload(fileName, req.file.buffer, {
-          contentType: req.file.mimetype,
-          cacheControl: "3600",
-        });
+        // Resmi wardrobes bucket'ına yükle
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("wardrobes")
+          .upload(fileName, req.file.buffer, {
+            contentType: req.file.mimetype,
+            cacheControl: "3600",
+          });
 
-      if (uploadError) {
-        throw uploadError;
+        if (uploadError) {
+          console.error("Dosya yükleme hatası:", uploadError);
+          throw uploadError;
+        }
+
+        // Yüklenen resmin public URL'ini al
+        const { data: publicUrlData } = supabase.storage
+          .from("wardrobes")
+          .getPublicUrl(fileName);
+
+        imageUrl = publicUrlData.publicUrl;
+        console.log("Resim dosyası başarıyla yüklendi, URL:", imageUrl);
+      } catch (uploadError) {
+        console.error("Dosya yükleme hatası:", uploadError);
+        // Hata olsa bile devam ediyoruz, resim olmadan da ürün eklenebilir
       }
-
-      // Yüklenen resmin public URL'ini al
-      const { data: publicUrlData } = supabase.storage
-        .from("wardrobes")
-        .getPublicUrl(fileName);
-
-      imageUrl = publicUrlData.publicUrl;
     }
+
+    // Eğer replicate URL'si geldiyse (arkaplanı kaldırılmış resim) Supabase'e yükle
+    let supabaseImageUrl = null;
+    try {
+      const replicateUrl = req.body.image_url || req.body.imageUrl;
+
+      if (replicateUrl) {
+        console.log(
+          "Gelen resim URL'si:",
+          replicateUrl.substring(0, 50) + "..."
+        );
+        // Replicate URL'si olup olmadığını kontrol et
+        if (replicateUrl.includes("replicate")) {
+          try {
+            console.log("Replicate URL tespit edildi, Supabase'e yükleniyor");
+            // Bu adımı tekrar aktif hale getiriyoruz
+            supabaseImageUrl = await uploadReplicateUrlToSupabase(replicateUrl);
+            console.log(
+              "Supabase'e yükleme sonucu:",
+              supabaseImageUrl
+                ? supabaseImageUrl.includes("supabase")
+                  ? "BAŞARILI"
+                  : "URL DEĞİŞMEDİ"
+                : "BAŞARISIZ"
+            );
+          } catch (replicateError) {
+            console.error("Replicate URL işleme hatası:", replicateError);
+            supabaseImageUrl = replicateUrl; // Hata durumunda orijinal URL'yi kullan
+          }
+        } else {
+          console.log("Normal URL tespit edildi, doğrudan kullanılıyor");
+          supabaseImageUrl = replicateUrl;
+        }
+      } else if (imageUrl) {
+        console.log(
+          "Resim URL'si bulunamadı, yüklenen dosya URL'si kullanılacak"
+        );
+        supabaseImageUrl = imageUrl;
+      } else {
+        console.log("Hiç resim URL'si bulunamadı");
+      }
+    } catch (urlProcessError) {
+      console.error("URL işleme hatası:", urlProcessError);
+      // URL işleme hatası olsa bile devam ediyoruz
+      // Resim olmadan da ürün eklenebilir
+    }
+
+    // Son durumda kullanılacak resim URL'sini belirle
+    const finalImageUrl =
+      supabaseImageUrl ||
+      imageUrl ||
+      req.body.image_url ||
+      req.body.imageUrl ||
+      null;
+    console.log(
+      "Final resim URL'si:",
+      finalImageUrl ? finalImageUrl.substring(0, 30) + "..." : "NULL"
+    );
 
     // Seasons ve tags verilerini kontrol et ve dönüştür
     let parsedSeasons = [];
@@ -525,7 +706,7 @@ router.post("/wardrobe", upload.single("image"), async (req, res) => {
       p_purchase_date: processedPurchaseDate, // Düzeltilmiş: boş string yerine null
       p_tags: parsedTags,
       p_visibility: visibility,
-      p_image_url: req.body.image_url || req.body.imageUrl || imageUrl, // Önce içinde image_url var mı kontrol et, yoksa imageUrl, en son normal imageUrl
+      p_image_url: finalImageUrl, // Belirlenen final URL'yi kullan
     });
 
     if (error) {
@@ -552,7 +733,7 @@ router.post("/wardrobe", upload.single("image"), async (req, res) => {
             purchase_date: processedPurchaseDate, // Düzeltilmiş: boş string yerine null
             tags: parsedTags,
             visibility: visibility,
-            image_url: req.body.image_url || req.body.imageUrl || imageUrl, // Önce içinde image_url var mı kontrol et, yoksa imageUrl, en son normal imageUrl
+            image_url: finalImageUrl, // Belirlenen final URL'yi kullan
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
@@ -2176,111 +2357,6 @@ router.post(
         });
       }
 
-      // Replicate URL'yi Supabase'e yükleyip yeni URL döndüren yardımcı fonksiyon
-      const uploadReplicateUrlToSupabase = async (replicateUrl) => {
-        try {
-          if (!replicateUrl) {
-            console.log("Resim URL'si boş veya tanımsız!");
-            return null;
-          }
-
-          console.log("======= REPLICATE URL İŞLEME BAŞLADI =======");
-          console.log("Gelen URL:", replicateUrl);
-          console.log("URL tipi:", typeof replicateUrl);
-
-          // URL formatını doğrula
-          if (!replicateUrl.startsWith("http")) {
-            console.error(
-              "Geçersiz URL formatı! HTTP ile başlamıyor:",
-              replicateUrl
-            );
-            return null;
-          }
-
-          console.log(
-            "Replicate URL'yi Supabase'e yükleme başlatılıyor:",
-            replicateUrl
-          );
-
-          // Replicate URL'den resmi fetch et
-          console.log("Resim indirme işlemi başlatılıyor...");
-          const response = await fetch(replicateUrl);
-
-          if (!response.ok) {
-            console.error(
-              `Resim indirme başarısız! HTTP ${response.status}: ${response.statusText}`
-            );
-            throw new Error(`Resim indirilemedi. Status: ${response.status}`);
-          }
-
-          console.log("Resim başarıyla indirildi, buffer'a dönüştürülüyor...");
-
-          // Resmi buffer olarak al
-          const imageBuffer = await response.arrayBuffer();
-          console.log("Buffer boyutu:", imageBuffer.byteLength, "bytes");
-
-          if (imageBuffer.byteLength === 0) {
-            console.error("İndirilen resim boş (0 byte)!");
-            return null;
-          }
-
-          // Dosya adı oluştur
-          const fileExt = "png"; // Replicate genellikle PNG döndürür
-          const fileName = `wardrobe_replicate_${Date.now()}_${Math.random()
-            .toString(36)
-            .substring(2, 15)}.${fileExt}`;
-
-          console.log("Oluşturulan dosya adı:", fileName);
-          console.log("Supabase storage yükleme işlemi başlatılıyor...");
-
-          // Resmi wardrobes bucket'ına yükle
-          const { data: uploadData, error: uploadError } =
-            await supabase.storage
-              .from("wardrobes")
-              .upload(fileName, imageBuffer, {
-                contentType: "image/png",
-                cacheControl: "3600",
-              });
-
-          if (uploadError) {
-            console.error(
-              "Supabase'e replicate resmi yükleme hatası:",
-              uploadError
-            );
-            console.error("Hata detayları:", JSON.stringify(uploadError));
-            return replicateUrl; // Hata durumunda orijinal URL'yi döndür
-          }
-
-          console.log("Supabase'e yükleme başarılı, public URL alınıyor...");
-
-          // Yüklenen resmin public URL'ini al
-          const { data: publicUrlData } = supabase.storage
-            .from("wardrobes")
-            .getPublicUrl(fileName);
-
-          if (!publicUrlData || !publicUrlData.publicUrl) {
-            console.error("Public URL alınamadı:", publicUrlData);
-            return replicateUrl; // URL alınamazsa orijinal URL'yi döndür
-          }
-
-          const supabaseImageUrl = publicUrlData.publicUrl;
-          console.log(
-            "Replicate resmi Supabase'e yüklendi, yeni URL:",
-            supabaseImageUrl
-          );
-          console.log("======= REPLICATE URL İŞLEME TAMAMLANDI =======");
-
-          return supabaseImageUrl;
-        } catch (error) {
-          console.error("====== REPLICATE RESMİ YÜKLEME HATASI ======");
-          console.error("Hata:", error);
-          console.error("Hata mesajı:", error.message);
-          console.error("Hata stack:", error.stack);
-          console.error("Orijinal URL:", replicateUrl);
-          return replicateUrl; // Hata durumunda orijinal URL'yi döndür
-        }
-      };
-
       const results = [];
       const errors = [];
 
@@ -2343,18 +2419,41 @@ router.post(
 
           // URL var mı kontrol et
           let supabaseImageUrl = null;
+
           if (imageUrlToUse) {
-            console.log(
-              `Ürün ${i + 1} için Supabase'e resim yükleme başlatılıyor...`
-            );
-            supabaseImageUrl = await uploadReplicateUrlToSupabase(
-              imageUrlToUse
-            );
-            console.log(
-              `Ürün ${i + 1} için Supabase'e resim yükleme sonucu: ${
-                supabaseImageUrl ? "BAŞARILI" : "BAŞARISIZ"
-              }`
-            );
+            // Eğer URL replicate içeriyorsa yükle
+            if (imageUrlToUse.includes("replicate")) {
+              try {
+                console.log(
+                  `Ürün ${i + 1} için Replicate URL Supabase'e yükleniyor...`
+                );
+                supabaseImageUrl = await uploadReplicateUrlToSupabase(
+                  imageUrlToUse
+                );
+                // Sonucu kontrol et - eğer URL değişmişse başarılı
+                const isSuccess =
+                  supabaseImageUrl && supabaseImageUrl.includes("supabase");
+                console.log(
+                  `Ürün ${i + 1} için Supabase'e resim yükleme sonucu: ${
+                    isSuccess ? "BAŞARILI" : "URL DEĞİŞMEDİ"
+                  }`
+                );
+              } catch (uploadError) {
+                console.error(
+                  `Ürün ${i + 1} için Supabase yükleme hatası:`,
+                  uploadError
+                );
+                supabaseImageUrl = imageUrlToUse; // Hata durumunda original URL'yi kullan
+              }
+            } else {
+              // Replicate URL değilse doğrudan kullan
+              supabaseImageUrl = imageUrlToUse;
+              console.log(
+                `Ürün ${
+                  i + 1
+                } için replicate URL olmadığından direkt kullanılıyor.`
+              );
+            }
           } else {
             console.log(
               `Ürün ${i + 1} için yüklenecek resim URL'si bulunamadı.`
@@ -2536,5 +2635,50 @@ router.post(
     }
   }
 );
+
+// Replicate URL'yi Supabase'e yüklemek için endpoint
+router.post("/wardrobe/process-replicate-url", async (req, res) => {
+  try {
+    const { replicateUrl } = req.body;
+
+    if (!replicateUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "Replicate URL'si gerekli",
+      });
+    }
+
+    console.log(
+      "İstek alındı. Replicate URL'si işleniyor:",
+      replicateUrl.substring(0, 50) + "..."
+    );
+
+    // Önce URL'yi Supabase'e yükle
+    const supabaseImageUrl = await uploadReplicateUrlToSupabase(replicateUrl);
+
+    if (!supabaseImageUrl || supabaseImageUrl === replicateUrl) {
+      return res.status(500).json({
+        success: false,
+        message: "Replicate URL'si Supabase'e yüklenemedi",
+        originalUrl: replicateUrl,
+      });
+    }
+
+    // Başarılı yanıt döndür
+    res.status(200).json({
+      success: true,
+      message: "Replicate URL'si başarıyla Supabase'e yüklendi",
+      imageUrl: supabaseImageUrl,
+      originalUrl: replicateUrl,
+    });
+  } catch (error) {
+    console.error("Replicate URL işleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Replicate URL'si işlenirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
 
 module.exports = router;
