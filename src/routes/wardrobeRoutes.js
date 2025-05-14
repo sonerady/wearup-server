@@ -339,10 +339,35 @@ router.get("/wardrobe/outfits", async (req, res) => {
 
       console.log(`${outfits ? outfits.length : 0} adet outfit bulundu`);
 
+      // Kullanıcının beğendiği outfitleri kontrol et
+      // wardrobe_outfit_likes tablosundan kullanıcının beğenilerini getir
+      const { data: userLikes, error: likesError } = await supabase
+        .from("wardrobe_outfit_likes")
+        .select("outfit_id")
+        .eq("user_id", userId);
+
+      if (likesError) {
+        console.error("Beğeni bilgileri alınırken hata:", likesError);
+      }
+
+      // Beğenilen outfit ID'lerini bir diziye dönüştür
+      const likedOutfitIds = (userLikes || []).map((like) => like.outfit_id);
+      console.log(
+        `Kullanıcının beğendiği ${likedOutfitIds.length} adet outfit bulundu`
+      );
+
+      // Her outfit için isLiked alanını ekle
+      const outfitsWithLikeInfo = outfits
+        ? outfits.map((outfit) => ({
+            ...outfit,
+            isLiked: likedOutfitIds.includes(outfit.id),
+          }))
+        : [];
+
       // Boş dizi dönme durumunda bile başarılı yanıt gönder
       return res.status(200).json({
         success: true,
-        data: outfits || [],
+        data: outfitsWithLikeInfo,
         pagination: {
           page,
           limit,
@@ -2701,6 +2726,650 @@ router.post("/wardrobe/process-replicate-url", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Replicate URL'si işlenirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
+// Outfit görüntülenme sayısını artır
+router.post("/wardrobe/outfits/:id/increment-views", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Önce outfit'i kontrol et
+    const { data: outfit, error: outfitError } = await supabase
+      .from("wardrobe_outfits")
+      .select("views_count")
+      .eq("id", id)
+      .single();
+
+    if (outfitError) {
+      throw outfitError;
+    }
+
+    if (!outfit) {
+      return res.status(404).json({
+        success: false,
+        message: "Outfit bulunamadı",
+      });
+    }
+
+    // Görüntülenme sayısını artır
+    const newViewCount = (outfit.views_count || 0) + 1;
+
+    // Veritabanını güncelle
+    const { data: updatedOutfit, error: updateError } = await supabase
+      .from("wardrobe_outfits")
+      .update({ views_count: newViewCount })
+      .eq("id", id)
+      .select("views_count")
+      .single();
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        viewCount: updatedOutfit.views_count,
+      },
+    });
+  } catch (error) {
+    console.error("Görüntülenme sayısı artırma hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Görüntülenme sayısı artırılırken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
+// Beğeni sayısını artır/azalt
+router.post("/wardrobe/outfits/:id/toggle-like", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, action } = req.body;
+
+    if (!userId || !action || !["like", "unlike"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Kullanıcı ID ve geçerli bir işlem (like veya unlike) zorunludur",
+      });
+    }
+
+    // Önce outfit'i kontrol et
+    const { data: outfit, error: outfitError } = await supabase
+      .from("wardrobe_outfits")
+      .select("likes_count")
+      .eq("id", id)
+      .single();
+
+    if (outfitError) {
+      throw outfitError;
+    }
+
+    if (!outfit) {
+      return res.status(404).json({
+        success: false,
+        message: "Outfit bulunamadı",
+      });
+    }
+
+    // Beğeni sayısını artır veya azalt
+    const newLikeCount =
+      action === "like"
+        ? Math.max(0, (outfit.likes_count || 0) + 1)
+        : Math.max(0, (outfit.likes_count || 0) - 1);
+
+    // Veritabanını güncelle
+    const { data: updatedOutfit, error: updateError } = await supabase
+      .from("wardrobe_outfits")
+      .update({ likes_count: newLikeCount })
+      .eq("id", id)
+      .select("likes_count")
+      .single();
+
+    if (updateError) {
+      throw updateError;
+    }
+    // İsteğe bağlı: outfit_likes tablosunu güncelle (ilişkisel takip için)
+    let likeResult;
+    if (action === "like") {
+      // Beğeni kaydını ekle
+      console.log(`Beğeni kaydı ekleniyor: user=${userId}, outfit=${id}`);
+
+      try {
+        // Doğrudan wardrobe_outfit_likes tablosunu kullan - foreign key sorunu yaşamayacak
+        const { data: likeData, error: likeError } = await supabase
+          .from("wardrobe_outfit_likes") // Foreign key kısıtlaması olmayan tablo
+          .upsert([
+            {
+              user_id: userId,
+              outfit_id: id,
+              created_at: new Date().toISOString(),
+            },
+          ]);
+
+        if (likeError) {
+          console.error("Beğeni kaydı hatası:", likeError);
+          console.log(
+            "Sadece beğeni sayısı güncellendi, ilişkisel kayıt yapılamadı"
+          );
+
+          // Hata detayları logla
+          if (likeError.code) {
+            console.error("Hata kodu:", likeError.code);
+          }
+          if (likeError.message) {
+            console.error("Hata mesajı:", likeError.message);
+          }
+          if (likeError.details) {
+            console.error("Hata detayları:", likeError.details);
+          }
+
+          likeResult = {
+            success: false,
+            action: "like",
+            error: likeError.message || "Bilinmeyen hata",
+          };
+        } else {
+          console.log("Beğeni kaydı başarıyla eklendi");
+          likeResult = { success: true, action: "like", data: likeData };
+        }
+      } catch (likeError) {
+        console.error(
+          "Beğeni kaydı işlemi sırasında beklenmeyen hata:",
+          likeError
+        );
+        likeResult = {
+          success: false,
+          action: "like",
+          error: likeError.message || "Bilinmeyen hata",
+        };
+        // Hata olsa bile işlemi başarılı sayalım, çünkü ana tabloda likes_count artık güncellendi
+      }
+    } else {
+      // Beğeni kaydını kaldır
+      console.log(`Beğeni kaydı kaldırılıyor: user=${userId}, outfit=${id}`);
+
+      try {
+        // Doğrudan wardrobe_outfit_likes tablosundan sil
+        const { data: deleteData, error: deleteError } = await supabase
+          .from("wardrobe_outfit_likes")
+          .delete()
+          .eq("user_id", userId)
+          .eq("outfit_id", id)
+          .select();
+
+        if (deleteError) {
+          console.error("Beğeni kaydı silme hatası:", deleteError);
+          likeResult = {
+            success: false,
+            action: "unlike",
+            error: deleteError.message || "Bilinmeyen hata",
+          };
+        } else {
+          console.log("Beğeni kaydı başarıyla silindi");
+          likeResult = { success: true, action: "unlike", data: deleteData };
+        }
+      } catch (deleteError) {
+        console.error(
+          "Beğeni silme işlemi sırasında beklenmeyen hata:",
+          deleteError
+        );
+        likeResult = {
+          success: false,
+          action: "unlike",
+          error: deleteError.message || "Bilinmeyen hata",
+        };
+        // Hata olsa bile işlemi başarılı sayalım
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message:
+        action === "like" ? "Outfit beğenildi" : "Outfit beğenisi kaldırıldı",
+      data: {
+        likeCount: updatedOutfit.likes_count,
+        isLiked: action === "like",
+        likeResult,
+      },
+    });
+  } catch (error) {
+    console.error("Beğeni işlemi hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Beğeni işlemi sırasında bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
+// YORUM İŞLEMLERİ İÇİN YENİ API ENDPOINT'LERİ
+
+// Yorum ekle
+router.post("/wardrobe/outfits/comment", async (req, res) => {
+  try {
+    const { userId, outfitId, comment, parent_id } = req.body;
+
+    if (!userId || !outfitId || !comment) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID, Outfit ID ve yorum içeriği zorunludur",
+      });
+    }
+
+    // Eğer parent_id varsa, bu ID'ye sahip bir yorum olduğundan emin ol
+    if (parent_id) {
+      const { data: parentComment, error: parentError } = await supabase
+        .from("wardrobe_outfit_comments") // Yeni tablo
+        .select("id")
+        .eq("id", parent_id)
+        .single();
+
+      if (parentError || !parentComment) {
+        console.log("Ebeveyn yorum kontrol hatası:", parentError);
+        return res.status(400).json({
+          success: false,
+          message: "Yanıt verilmek istenen yorum bulunamadı",
+        });
+      }
+    }
+
+    console.log(`Yorum ekleniyor: user=${userId}, outfit=${outfitId}`);
+
+    // Yorumu ekle - foreign key kısıtlaması olmayan tabloyu kullan
+    const { data, error } = await supabase
+      .from("wardrobe_outfit_comments") // Yeni tablo
+      .insert([
+        {
+          user_id: userId,
+          outfit_id: outfitId,
+          comment: comment,
+          parent_id: parent_id || null,
+          created_at: new Date().toISOString(),
+        },
+      ])
+      .select();
+
+    if (error) {
+      console.error("Yorum ekleme hatası:", error);
+
+      // Hata detaylarını logla
+      if (error.code) console.error("Hata kodu:", error.code);
+      if (error.message) console.error("Hata mesajı:", error.message);
+      if (error.details) console.error("Hata detayları:", error.details);
+
+      throw error;
+    }
+
+    console.log("Yorum başarıyla eklendi:", data[0].id);
+
+    // Yorum sayısını getir
+    const { count, error: countError } = await supabase
+      .from("wardrobe_outfit_comments") // Yeni tablo
+      .select("id", { count: "exact", head: true })
+      .eq("outfit_id", outfitId);
+
+    if (countError) {
+      console.error("Yorum sayısı sayma hatası:", countError);
+      throw countError;
+    }
+
+    console.log(`Toplam yorum sayısı: ${count}`);
+
+    // wardrobe_outfits tablosundaki comments_count alanını güncelle
+    const { error: updateError } = await supabase
+      .from("wardrobe_outfits")
+      .update({ comments_count: count || 0 })
+      .eq("id", outfitId);
+
+    if (updateError) {
+      console.error("Yorum sayısı güncellenirken hata:", updateError);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Yorum başarıyla eklendi",
+      data: {
+        comment: data[0],
+        commentCount: count || 0,
+      },
+    });
+  } catch (error) {
+    console.error("Yorum ekleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Yorum eklenirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
+// Outfit yorumlarını getir
+router.get("/wardrobe/outfits/:outfitId/comments", async (req, res) => {
+  try {
+    const { outfitId } = req.params;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+
+    if (!outfitId) {
+      return res.status(400).json({
+        success: false,
+        message: "Outfit ID zorunludur",
+      });
+    }
+
+    console.log(
+      `Yorumlar getiriliyor, outfit=${outfitId}, limit=${limit}, offset=${offset}`
+    );
+
+    // Sadece yorumları getir, ilişkisel sorgu kullanmadan
+    const {
+      data: comments,
+      error: commentsError,
+      count,
+    } = await supabase
+      .from("wardrobe_outfit_comments")
+      .select("*", { count: "exact" })
+      .eq("outfit_id", outfitId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (commentsError) {
+      console.error("Yorum getirme hatası:", commentsError);
+      throw commentsError;
+    }
+
+    // Eğer yorum yoksa boş array dön
+    if (!comments || comments.length === 0) {
+      console.log("Hiç yorum bulunamadı");
+      return res.status(200).json({
+        success: true,
+        data: [],
+        pagination: {
+          total: 0,
+          limit,
+          offset,
+        },
+      });
+    }
+
+    console.log(`${comments.length} adet yorum bulundu`);
+
+    // Yorumlarda yer alan tüm benzersiz kullanıcı ID'lerini topla
+    const userIds = [...new Set(comments.map((comment) => comment.user_id))];
+    console.log(`Yorumları yapan ${userIds.length} benzersiz kullanıcı var`);
+
+    // Kullanıcı bilgilerini ayrı bir sorgu ile getir
+    let userMap = {};
+
+    if (userIds.length > 0) {
+      try {
+        const { data: users, error: usersError } = await supabase
+          .from("users")
+          .select("id, username, avatar_url")
+          .in("id", userIds);
+
+        if (usersError) {
+          console.error("Kullanıcı bilgileri getirme hatası:", usersError);
+        } else if (users) {
+          // Kullanıcı bilgilerini bir map'e dönüştür
+          userMap = users.reduce((map, user) => {
+            map[user.id] = user;
+            return map;
+          }, {});
+          console.log(`${users.length} kullanıcı bilgisi başarıyla getirildi`);
+        }
+      } catch (userError) {
+        console.error(
+          "Kullanıcı bilgileri alınırken beklenmeyen hata:",
+          userError
+        );
+      }
+    }
+
+    // Yorumları kullanıcı bilgileriyle birleştir
+    const commentsWithUserInfo = comments.map((comment) => {
+      const user = userMap[comment.user_id] || {
+        username: "Bilinmeyen Kullanıcı",
+        avatar_url: null,
+      };
+
+      return {
+        ...comment,
+        user: {
+          id: comment.user_id,
+          username: user.username,
+          avatar_url: user.avatar_url,
+        },
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: commentsWithUserInfo,
+      pagination: {
+        total: count || 0,
+        limit,
+        offset,
+      },
+    });
+  } catch (error) {
+    console.error("Yorumları getirme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Yorumlar getirilirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
+// Wardrobe outfit'lerini kaydet/kayıt kaldır (toggle)
+router.post("/wardrobe/outfits/save", async (req, res) => {
+  try {
+    const { userId, outfitId } = req.body;
+
+    if (!userId || !outfitId) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID ve Outfit ID zorunludur",
+      });
+    }
+
+    console.log(`Kaydetme işlemi, user=${userId}, outfit=${outfitId}`);
+
+    // Önce kayıt durumunu kontrol et
+    const { data: existingSave, error: checkError } = await supabase
+      .from("wardrobe_outfit_saves") // Yeni tablo
+      .select("*")
+      .eq("user_id", userId)
+      .eq("outfit_id", outfitId)
+      .single();
+
+    if (checkError && checkError.code !== "PGRST116") {
+      // PGRST116: Tek sonuç beklenen sorguda sonuç bulunamadı
+      console.error("Kayıt durumu kontrol hatası:", checkError);
+      throw checkError;
+    }
+
+    let result;
+    let message;
+    let isSaved;
+
+    // Kayıt varsa sil, yoksa ekle
+    if (existingSave) {
+      console.log("Önceki kayıt bulundu, siliniyor:", existingSave.id);
+
+      const { error: deleteError } = await supabase
+        .from("wardrobe_outfit_saves") // Yeni tablo
+        .delete()
+        .eq("id", existingSave.id);
+
+      if (deleteError) {
+        console.error("Kayıt silme hatası:", deleteError);
+        throw deleteError;
+      }
+
+      message = "Outfit kaydı kaldırıldı";
+      isSaved = false;
+      result = null;
+      console.log("Kayıt başarıyla silindi");
+    } else {
+      console.log("Yeni kayıt oluşturuluyor");
+
+      const { data: insertData, error: insertError } = await supabase
+        .from("wardrobe_outfit_saves") // Yeni tablo
+        .insert([
+          {
+            user_id: userId,
+            outfit_id: outfitId,
+            created_at: new Date().toISOString(),
+          },
+        ])
+        .select();
+
+      if (insertError) {
+        console.error("Kayıt ekleme hatası:", insertError);
+        throw insertError;
+      }
+
+      message = "Outfit kaydedildi";
+      isSaved = true;
+      result = insertData[0];
+      console.log("Outfit başarıyla kaydedildi:", result?.id);
+    }
+
+    // Kaydedilen toplam sayıyı getir
+    const { count, error: countError } = await supabase
+      .from("wardrobe_outfit_saves") // Yeni tablo
+      .select("id", { count: "exact", head: true })
+      .eq("outfit_id", outfitId);
+
+    if (countError) {
+      console.error("Kayıt sayısı sayma hatası:", countError);
+      throw countError;
+    }
+
+    console.log(`Toplam kayıt sayısı: ${count}`);
+
+    // wardrobe_outfits tablosunda saves_count güncelle
+    const { error: updateError } = await supabase
+      .from("wardrobe_outfits")
+      .update({ saves_count: count || 0 })
+      .eq("id", outfitId);
+
+    if (updateError) {
+      console.error("Kaydetme sayısı güncellenirken hata:", updateError);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: message,
+      data: {
+        isSaved: isSaved,
+        saveCount: count || 0,
+        save: result,
+      },
+    });
+  } catch (error) {
+    console.error("Outfit kaydetme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Outfit kaydedilirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
+// Tek bir outfit detayı getir
+router.get("/wardrobe/outfits/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.query.userId; // Kullanıcı ID'si de gerekli
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Outfit ID gerekli",
+      });
+    }
+
+    console.log(
+      `Outfit detayı getiriliyor. ID: ${id}, UserId: ${
+        userId || "belirtilmedi"
+      }`
+    );
+
+    // Outfit detayını getir
+    const { data: outfit, error: outfitError } = await supabase
+      .from("wardrobe_outfits")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (outfitError) {
+      console.error("Outfit detayı getirme hatası:", outfitError);
+      return res.status(404).json({
+        success: false,
+        message: "Outfit bulunamadı",
+        error: outfitError.message,
+      });
+    }
+
+    if (!outfit) {
+      return res.status(404).json({
+        success: false,
+        message: "Outfit bulunamadı",
+      });
+    }
+
+    // Eğer kullanıcı ID'si verilmişse, beğeni durumunu kontrol et
+    let isLiked = false;
+
+    if (userId) {
+      // Kullanıcının bu outfit'i beğenip beğenmediğini kontrol et
+      const { data: likeRecord, error: likeError } = await supabase
+        .from("wardrobe_outfit_likes")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("outfit_id", id)
+        .maybeSingle();
+
+      if (!likeError && likeRecord) {
+        isLiked = true;
+      }
+
+      if (likeError && likeError.code !== "PGRST116") {
+        // PGRST116: Tek sonuç beklenen sorguda sonuç bulunamadı
+        console.error("Beğeni durumu kontrol hatası:", likeError);
+      }
+    }
+
+    // Outfit bilgisine beğeni durumunu ekle
+    const outfitWithLikeInfo = {
+      ...outfit,
+      isLiked,
+    };
+
+    console.log(
+      `Outfit detayı başarıyla getirildi. Beğeni durumu: ${
+        isLiked ? "Beğenilmiş" : "Beğenilmemiş"
+      }`
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: outfitWithLikeInfo,
+    });
+  } catch (error) {
+    console.error("Outfit detayı getirme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Outfit detayı getirilirken bir hata oluştu",
       error: error.message,
     });
   }
