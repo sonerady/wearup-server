@@ -224,7 +224,7 @@ router.post("/outfits/comment", async (req, res) => {
     // Eğer parent_id varsa, bu ID'ye sahip bir yorum olduğundan emin ol
     if (parent_id) {
       const { data: parentComment, error: parentError } = await supabase
-        .from("outfit_comments")
+        .from("wardrobe_outfit_comments")
         .select("id")
         .eq("id", parent_id)
         .single();
@@ -239,7 +239,7 @@ router.post("/outfits/comment", async (req, res) => {
 
     // Yorumu ekle
     const { data, error } = await supabase
-      .from("outfit_comments")
+      .from("wardrobe_outfit_comments")
       .insert([
         {
           user_id: userId,
@@ -257,7 +257,7 @@ router.post("/outfits/comment", async (req, res) => {
 
     // Yorum sayısını getir
     const { count, error: countError } = await supabase
-      .from("outfit_comments")
+      .from("wardrobe_outfit_comments")
       .select("id", { count: "exact", head: true })
       .eq("outfit_id", outfitId);
 
@@ -307,7 +307,7 @@ router.get("/outfits/:outfitId/comments", async (req, res) => {
 
     // Tüm yorumları getir (ana yorumlar ve yanıtlar)
     const { data, error, count } = await supabase
-      .from("outfit_comments")
+      .from("wardrobe_outfit_comments")
       .select(
         `
         *,

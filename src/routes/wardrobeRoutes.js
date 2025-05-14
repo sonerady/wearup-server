@@ -263,14 +263,25 @@ router.get("/wardrobe/outfits", async (req, res) => {
         });
       }
 
-      // Önce wardrobe_outfits tablosundan kullanıcının outfitlerini getir (sayfalı)
+      // Foreign key ilişkisini kullanarak wardrobe_outfits ve users tablolarını birleştir
+      // users tablosundan username ve avatar_url bilgilerini de getir
       const {
         data: outfits,
         error: outfitsError,
         count,
       } = await supabase
         .from("wardrobe_outfits")
-        .select("*", { count: "exact" })
+        .select(
+          `
+          *,
+          users:user_id (
+            id,
+            username,
+            avatar_url
+          )
+        `,
+          { count: "exact" }
+        )
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1);
@@ -338,6 +349,11 @@ router.get("/wardrobe/outfits", async (req, res) => {
       }
 
       console.log(`${outfits ? outfits.length : 0} adet outfit bulundu`);
+
+      // Kullanıcı bilgilerini kontrol et
+      if (outfits && outfits.length > 0) {
+        console.log("İlk outfit'in users bilgisi:", outfits[0].users);
+      }
 
       // Kullanıcının beğendiği outfitleri kontrol et
       // wardrobe_outfit_likes tablosundan kullanıcının beğenilerini getir
@@ -2987,14 +3003,24 @@ router.get("/wardrobe/outfits/:outfitId/comments", async (req, res) => {
       `Yorumlar getiriliyor, outfit=${outfitId}, limit=${limit}, offset=${offset}`
     );
 
-    // Sadece yorumları getir, ilişkisel sorgu kullanmadan
+    // Yorumları users tablosu ile join yaparak getir
     const {
       data: comments,
       error: commentsError,
       count,
     } = await supabase
       .from("wardrobe_outfit_comments")
-      .select("*", { count: "exact" })
+      .select(
+        `
+        *,
+        users:user_id (
+          id,
+          username,
+          avatar_url
+        )
+      `,
+        { count: "exact" }
+      )
       .eq("outfit_id", outfitId)
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
@@ -3020,51 +3046,14 @@ router.get("/wardrobe/outfits/:outfitId/comments", async (req, res) => {
 
     console.log(`${comments.length} adet yorum bulundu`);
 
-    // Yorumlarda yer alan tüm benzersiz kullanıcı ID'lerini topla
-    const userIds = [...new Set(comments.map((comment) => comment.user_id))];
-    console.log(`Yorumları yapan ${userIds.length} benzersiz kullanıcı var`);
-
-    // Kullanıcı bilgilerini ayrı bir sorgu ile getir
-    let userMap = {};
-
-    if (userIds.length > 0) {
-      try {
-        const { data: users, error: usersError } = await supabase
-          .from("users")
-          .select("id, username, avatar_url")
-          .in("id", userIds);
-
-        if (usersError) {
-          console.error("Kullanıcı bilgileri getirme hatası:", usersError);
-        } else if (users) {
-          // Kullanıcı bilgilerini bir map'e dönüştür
-          userMap = users.reduce((map, user) => {
-            map[user.id] = user;
-            return map;
-          }, {});
-          console.log(`${users.length} kullanıcı bilgisi başarıyla getirildi`);
-        }
-      } catch (userError) {
-        console.error(
-          "Kullanıcı bilgileri alınırken beklenmeyen hata:",
-          userError
-        );
-      }
-    }
-
-    // Yorumları kullanıcı bilgileriyle birleştir
+    // Kullanıcı bilgisi ile birlikte gelen yorumları formatla
     const commentsWithUserInfo = comments.map((comment) => {
-      const user = userMap[comment.user_id] || {
-        username: "Bilinmeyen Kullanıcı",
-        avatar_url: null,
-      };
-
       return {
         ...comment,
-        user: {
+        user: comment.users || {
           id: comment.user_id,
-          username: user.username,
-          avatar_url: user.avatar_url,
+          username: "Bilinmeyen Kullanıcı",
+          avatar_url: null,
         },
       };
     });
@@ -3224,10 +3213,19 @@ router.get("/wardrobe/outfits/:id", async (req, res) => {
       }`
     );
 
-    // Outfit detayını getir
+    // Outfit detayını getir - users tablosu ile join yaparak kullanıcı bilgilerini de al
     const { data: outfit, error: outfitError } = await supabase
       .from("wardrobe_outfits")
-      .select("*")
+      .select(
+        `
+        *,
+        users:user_id (
+          id,
+          username,
+          avatar_url
+        )
+      `
+      )
       .eq("id", id)
       .single();
 
@@ -3246,6 +3244,9 @@ router.get("/wardrobe/outfits/:id", async (req, res) => {
         message: "Outfit bulunamadı",
       });
     }
+
+    // Kullanıcı bilgilerini kontrol et
+    console.log("Outfit'in users bilgisi:", outfit.users);
 
     // Eğer kullanıcı ID'si verilmişse, beğeni durumunu kontrol et
     let isLiked = false;
