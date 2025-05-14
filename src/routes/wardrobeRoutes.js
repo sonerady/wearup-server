@@ -345,7 +345,7 @@ router.get("/wardrobe/outfits", async (req, res) => {
         .from("wardrobe_outfit_likes")
         .select("outfit_id")
         .eq("user_id", userId);
-
+ 
       if (likesError) {
         console.error("Beğeni bilgileri alınırken hata:", likesError);
       }
