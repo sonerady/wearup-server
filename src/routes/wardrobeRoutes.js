@@ -345,7 +345,7 @@ router.get("/wardrobe/outfits", async (req, res) => {
         .from("wardrobe_outfit_likes")
         .select("outfit_id")
         .eq("user_id", userId);
- 
+
       if (likesError) {
         console.error("Beğeni bilgileri alınırken hata:", likesError);
       }
@@ -742,72 +742,43 @@ router.post("/wardrobe", upload.single("image"), async (req, res) => {
       processedDate: processedPurchaseDate,
     });
 
-    // Doğrudan SQL sorgusu ile veri ekleyelim - Bu RLS'i by-pass edecek
-    const { data, error } = await supabase.rpc("insert_wardrobe_item", {
-      p_user_id: userId,
-      p_item_name: itemName,
-      p_category: category, // Kategori artık ID olarak geliyor
-      p_seasons: parsedSeasons,
-      p_color: color,
-      p_notes: notes,
-      p_link_address: linkAddress,
-      p_item_size: itemSize,
-      p_purchase_price: processedPurchasePrice, // Düzeltilmiş: boş string yerine null
-      p_purchase_date: processedPurchaseDate, // Düzeltilmiş: boş string yerine null
-      p_tags: parsedTags,
-      p_visibility: visibility,
-      p_image_url: finalImageUrl, // Belirlenen final URL'yi kullan
-    });
+    // Direkt insert sorgusu kullanarak ürünü ekleyelim (RPC çağrısını atlayalım)
+    console.log("Direkt insert sorgusu kullanılıyor...");
 
-    if (error) {
-      console.error("Supabase veri ekleme hatası:", error);
+    const { data: sqlData, error: sqlError } = await supabase
+      .from("wardrobe_items")
+      .insert({
+        user_id: userId,
+        item_name: itemName,
+        category: category,
+        seasons: parsedSeasons,
+        color: color,
+        notes: notes,
+        link_address: linkAddress,
+        item_size: itemSize,
+        purchase_price: processedPurchasePrice,
+        purchase_date: processedPurchaseDate,
+        tags: parsedTags,
+        visibility: visibility,
+        image_url: finalImageUrl,
+        material: req.body.material || null,
+        style: req.body.style || null,
+        product_gender:
+          req.body.productGender || req.body.product_gender || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select("*");
 
-      // RLS hatası hala devam ediyorsa, daha düşük seviyeli bir SQL sorgusu deneyelim
-      if (error.message.includes("row-level security policy")) {
-        console.log(
-          "RLS hatası devam ediyor, doğrudan SQL sorgusu deneniyor..."
-        );
-
-        const { data: sqlData, error: sqlError } = await supabase
-          .from("wardrobe_items")
-          .insert({
-            user_id: userId,
-            item_name: itemName,
-            category: category, // Kategori artık ID olarak geliyor
-            seasons: parsedSeasons,
-            color: color,
-            notes: notes,
-            link_address: linkAddress,
-            item_size: itemSize,
-            purchase_price: processedPurchasePrice, // Düzeltilmiş: boş string yerine null
-            purchase_date: processedPurchaseDate, // Düzeltilmiş: boş string yerine null
-            tags: parsedTags,
-            visibility: visibility,
-            image_url: finalImageUrl, // Belirlenen final URL'yi kullan
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .select("*");
-
-        if (sqlError) {
-          console.error("SQL sorgusu da başarısız oldu:", sqlError);
-          throw sqlError;
-        }
-
-        return res.status(201).json({
-          success: true,
-          message: "Ürün SQL sorgusu ile başarıyla eklendi",
-          data: sqlData[0],
-        });
-      }
-
-      throw error;
+    if (sqlError) {
+      console.error("SQL sorgusu başarısız oldu:", sqlError);
+      throw sqlError;
     }
 
     res.status(201).json({
       success: true,
       message: "Ürün başarıyla eklendi",
-      data: data[0],
+      data: sqlData[0],
     });
   } catch (error) {
     console.error("Wardrobe öğesi ekleme hatası:", error);
@@ -2557,92 +2528,41 @@ router.post(
 
           // Veritabanı parametre nesnesi - Yazılması daha kolay olsun diye
           const dbParams = {
-            p_user_id: userId,
-            p_item_name: itemName,
-            p_category: category,
-            p_seasons: parsedSeasons,
-            p_color: color || null,
-            p_notes: notes || null,
-            p_link_address: linkAddress || null,
-            p_item_size: itemSize || null,
-            p_purchase_price: processedPurchasePrice, // Düzeltilmiş fiyat
-            p_purchase_date: processedPurchaseDate, // Düzeltilmiş tarih
-            p_tags: parsedTags,
-            p_visibility: visibility || "private",
-            p_image_url: supabaseImageUrl, // Supabase'e yüklenmiş resim URL'sini kullan
+            user_id: userId,
+            item_name: itemName,
+            category: category,
+            seasons: parsedSeasons,
+            color: color || null,
+            notes: notes || null,
+            link_address: linkAddress || null,
+            item_size: itemSize || null,
+            purchase_price: processedPurchasePrice, // Düzeltilmiş fiyat
+            purchase_date: processedPurchaseDate, // Düzeltilmiş tarih
+            tags: parsedTags,
+            visibility: visibility || "private",
+            image_url: supabaseImageUrl, // Supabase'e yüklenmiş resim URL'sini kullan
+            material: item.material || null, // Materyal bilgisini ekle
+            style: item.style || null, // Stil bilgisini ekle
+            product_gender: item.productGender || item.product_gender || null, // Ürün cinsiyet bilgisini ekle
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           };
 
           console.log(`Ürün ${i + 1} için DB parametreleri:`, dbParams);
 
-          // RPC fonksiyonu ile veri ekle
-          const { data, error } = await supabase.rpc(
-            "insert_wardrobe_item",
-            dbParams
-          );
+          // Direkt INSERT sorgusu ile ürünü ekle (RPC çağrısını atlayalım)
+          const { data: sqlData, error: sqlError } = await supabase
+            .from("wardrobe_items")
+            .insert(dbParams)
+            .select("*");
 
-          if (error) {
-            console.error(`Ürün ${i + 1} kaydedilirken hata:`, error);
-
-            // RLS hatası veya diğer bir hata durumunda direkt insert dene
-            if (
-              error.message.includes("row-level security policy") ||
-              error.code === "42501"
-            ) {
-              console.log(`Ürün ${i + 1} için direkt insert deneniyor...`);
-
-              const insertData = {
-                user_id: userId,
-                item_name: itemName,
-                category: category,
-                seasons: parsedSeasons,
-                color: color || null,
-                notes: notes || null,
-                link_address: linkAddress || null,
-                item_size: itemSize || null,
-                purchase_price: processedPurchasePrice, // Düzeltilmiş fiyat
-                purchase_date: processedPurchaseDate, // Düzeltilmiş tarih
-                tags: parsedTags,
-                visibility: visibility || "private",
-                image_url: supabaseImageUrl, // Supabase'e yüklenmiş resim URL'sini kullan
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-              };
-
-              console.log(`Ürün ${i + 1} için insert verisi:`, insertData);
-
-              const { data: sqlData, error: sqlError } = await supabase
-                .from("wardrobe_items")
-                .insert(insertData)
-                .select("*");
-
-              if (sqlError) {
-                console.error(
-                  `Ürün ${i + 1} için SQL sorgusu başarısız:`,
-                  sqlError
-                );
-                errors.push({
-                  index: i,
-                  error: sqlError.message,
-                  code: sqlError.code,
-                  details: sqlError.details,
-                });
-                continue;
-              }
-
-              results.push({
-                index: i,
-                success: true,
-                method: "direct-insert",
-                data: sqlData[0],
-              });
-              continue;
-            }
-
+          if (sqlError) {
+            console.error(`Ürün ${i + 1} kaydedilirken hata:`, sqlError);
             errors.push({
               index: i,
-              error: error.message,
-              code: error.code,
-              details: error.details,
+              error: sqlError.message,
+              code: sqlError.code,
+              details: sqlError.details,
             });
             continue;
           }
@@ -2651,8 +2571,8 @@ router.post(
           results.push({
             index: i,
             success: true,
-            method: "rpc",
-            data: data[0],
+            method: "direct-insert",
+            data: sqlData[0],
           });
         } catch (itemError) {
           console.error(`Ürün ${i + 1} kaydedilirken genel hata:`, itemError);
