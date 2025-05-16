@@ -15,8 +15,10 @@ router.post("/generate", async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Geçerli bir promptText ve en az bir referenceImage sağlanmalıdır.",
+        result: {
+          message:
+            "Geçerli bir promptText ve en az bir referenceImage sağlanmalıdır.",
+        },
       });
     }
 
@@ -61,30 +63,38 @@ router.post("/generate", async (req, res) => {
       console.log("Görev başarıyla tamamlandı");
       return res.status(200).json({
         success: true,
-        task,
-        imageUrl: task.output[0],
+        result: {
+          task,
+          imageUrl: task.output[0],
+        },
       });
     } else if (task.status === "FAILED") {
       console.error("Görev başarısız oldu:", task.error);
       return res.status(500).json({
         success: false,
-        message: "Resim oluşturma görevi başarısız oldu",
-        error: task.error,
+        result: {
+          message: "Resim oluşturma görevi başarısız oldu",
+          error: task.error,
+        },
       });
     } else {
       console.error("Görev zaman aşımına uğradı");
       return res.status(408).json({
         success: false,
-        message: "Resim oluşturma görevi zaman aşımına uğradı",
-        taskId: task.id,
+        result: {
+          message: "Resim oluşturma görevi zaman aşımına uğradı",
+          taskId: task.id,
+        },
       });
     }
   } catch (error) {
     console.error("Resim oluşturma hatası:", error);
     return res.status(500).json({
       success: false,
-      message: "Resim oluşturma sırasında bir hata oluştu",
-      error: error.message,
+      result: {
+        message: "Resim oluşturma sırasında bir hata oluştu",
+        error: error.message,
+      },
     });
   }
 });
@@ -139,30 +149,38 @@ router.get("/test", async (req, res) => {
       console.log("Test görevi başarıyla tamamlandı");
       return res.status(200).json({
         success: true,
-        task,
-        imageUrl: task.output[0],
+        result: {
+          task,
+          imageUrl: task.output[0],
+        },
       });
     } else if (task.status === "FAILED") {
       console.error("Test görevi başarısız oldu:", task.error);
       return res.status(500).json({
         success: false,
-        message: "Test resmi oluşturma görevi başarısız oldu",
-        error: task.error,
+        result: {
+          message: "Test resmi oluşturma görevi başarısız oldu",
+          error: task.error,
+        },
       });
     } else {
       console.error("Test görevi zaman aşımına uğradı");
       return res.status(408).json({
         success: false,
-        message: "Test resmi oluşturma görevi zaman aşımına uğradı",
-        taskId: task.id,
+        result: {
+          message: "Test resmi oluşturma görevi zaman aşımına uğradı",
+          taskId: task.id,
+        },
       });
     }
   } catch (error) {
     console.error("Test hatası:", error);
     return res.status(500).json({
       success: false,
-      message: "Test sırasında bir hata oluştu",
-      error: error.message,
+      result: {
+        message: "Test sırasında bir hata oluştu",
+        error: error.message,
+      },
     });
   }
 });
@@ -175,7 +193,9 @@ router.get("/task/:taskId", async (req, res) => {
     if (!taskId) {
       return res.status(400).json({
         success: false,
-        message: "Görev ID'si gereklidir",
+        result: {
+          message: "Görev ID'si gereklidir",
+        },
       });
     }
 
@@ -184,15 +204,19 @@ router.get("/task/:taskId", async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      task,
-      imageUrl: task.status === "SUCCEEDED" ? task.output[0] : null,
+      result: {
+        task,
+        imageUrl: task.status === "SUCCEEDED" ? task.output[0] : null,
+      },
     });
   } catch (error) {
     console.error("Görev durumu kontrolü hatası:", error);
     return res.status(500).json({
       success: false,
-      message: "Görev durumu kontrolü sırasında bir hata oluştu",
-      error: error.message,
+      result: {
+        message: "Görev durumu kontrolü sırasında bir hata oluştu",
+        error: error.message,
+      },
     });
   }
 });
