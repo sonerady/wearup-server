@@ -53,6 +53,8 @@ const locationRoutes = require("./routes/locationRoutes");
 const hairStyleRoutes = require("./routes/hairStyleRoutes");
 // Saç rengi rotalarını import et
 const hairColorRoutes = require("./routes/hairColorRoutes");
+// Referans görsel oluşturma rotalarını import et
+const referenceRoutes = require("./routes/referenceRoutes");
 
 // Yeni eklenen route import'ları
 const userProfileRoutes = require("./routes/userProfileRoutes");
@@ -134,6 +136,8 @@ app.use("/api/locations", locationRoutes);
 app.use("/api/hairstyles", hairStyleRoutes);
 // Saç rengi rotalarını ekle
 app.use("/api/haircolors", hairColorRoutes);
+// Referans görsel oluşturma rotalarını ekle
+app.use("/api/reference", referenceRoutes);
 
 // Mevcut route tanımlamaları
 app.use("/api", backgroundGeneratorRouter);
