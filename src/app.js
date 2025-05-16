@@ -47,6 +47,8 @@ const styleBattlesRoutes = require("./routes/styleBattles");
 const tournamentRoutes = require("./routes/tournamentRoutes");
 const generateProductNameRouter = require("./routes/generateProductName");
 const poseRoutes = require("./routes/poseRoutes");
+// Lokasyon rotalarını import et
+const locationRoutes = require("./routes/locationRoutes");
 
 // Yeni eklenen route import'ları
 const userProfileRoutes = require("./routes/userProfileRoutes");
@@ -122,6 +124,8 @@ app.use("/api", inspirationsRoutes);
 
 // Poz rotalarını ekle
 app.use("/api/poses", poseRoutes);
+// Lokasyon rotalarını ekle
+app.use("/api/locations", locationRoutes);
 
 // Mevcut route tanımlamaları
 app.use("/api", backgroundGeneratorRouter);
