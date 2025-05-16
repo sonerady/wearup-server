@@ -12,65 +12,6 @@ dotenv.config();
 const API_KEY = "6801844612505d276ac0ded9";
 const SCRAPINGDOG_URL = "https://api.scrapingdog.com/google_shopping/";
 
-// JSON verilerini dosyaya yazmak için yardımcı fonksiyon
-const saveToResultsJson = (data, requestType) => {
-  try {
-    // Proje ana dizini
-    const rootDir = path.resolve(__dirname, "../../../");
-    const filePath = path.join(rootDir, "results.json");
-
-    console.log(`Dosya yolu: ${filePath}`);
-
-    // Dosya varsa oku, yoksa boş bir obje oluştur
-    let jsonData = {};
-    if (fs.existsSync(filePath)) {
-      console.log("Mevcut dosya bulundu, içeriği okunuyor");
-      const fileContent = fs.readFileSync(filePath, "utf8");
-      try {
-        jsonData = JSON.parse(fileContent);
-      } catch (parseError) {
-        console.error("Mevcut JSON dosyası parse edilemedi:", parseError);
-        // Bozuk dosyayı yedekle
-        fs.writeFileSync(`${filePath}.bak`, fileContent);
-        console.log("Bozuk dosya yedeklendi, yeni dosya oluşturulacak");
-        jsonData = {};
-      }
-    } else {
-      console.log("Dosya bulunamadı, yeni dosya oluşturulacak");
-    }
-
-    // Zaman damgası oluştur
-    const timestamp = new Date().toISOString();
-
-    // Yeni istek verisini ekle (anahtar olarak istek türü ve zaman damgası kullan)
-    const requestKey = `${requestType}_${timestamp}`;
-    jsonData[requestKey] = data;
-
-    // Debug için
-    console.log(
-      `Yazılacak veri boyutu: ${JSON.stringify(data).length} karakter`
-    );
-
-    // Dosyaya yaz
-    fs.writeFileSync(filePath, JSON.stringify(jsonData, null, 2));
-    console.log(
-      `ScrapingDog API verisi results.json dosyasına kaydedildi: ${requestKey}`
-    );
-
-    // Kontrol et
-    if (fs.existsSync(filePath)) {
-      const stats = fs.statSync(filePath);
-      console.log(
-        `Dosya başarıyla oluşturuldu/güncellendi. Boyutu: ${stats.size} bytes`
-      );
-    } else {
-      console.error("Dosya yazma işleminden sonra dosya bulunamadı!");
-    }
-  } catch (error) {
-    console.error("Verileri dosyaya kaydederken hata:", error);
-  }
-};
-
 // Helper: data URI'yi decode edip sharp ile dönüştürür
 async function convertWebPtoPNGorJPG(dataUri, format = "png") {
   // data:image/webp;base64,AAAA...
@@ -101,9 +42,6 @@ async function searchProducts(query) {
     const data = response.data;
 
     console.log("dataaaa", data);
-
-    // Sadece orijinal ScrapingDog API yanıtını results.json dosyasına kaydet
-    saveToResultsJson(data, "scrapingdog_search");
 
     if (!data.shopping_results?.length) return [];
 
@@ -156,9 +94,6 @@ async function getProductDetails(productId) {
     const productData = response.data;
 
     console.log("Ürün detayı yanıtı:", productData);
-
-    // Sadece orijinal ürün detayı yanıtını results.json dosyasına kaydet
-    saveToResultsJson(productData, "scrapingdog_product");
 
     // Resim URL'lerini çıkarma
     const imageUrls = [];

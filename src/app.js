@@ -27,9 +27,7 @@ const generatePredictionsRouter = require("./routes/generatePredictions");
 const generateImgToVidRouter = require("./routes/generateImgToVid");
 const getPredictionsRouter = require("./routes/getPredictions");
 const registerAnonymousUserRouter = require("./routes/registerAnonymousUser");
-const posesRouter = require("./routes/posesRoutes");
 const generateImagesJsonRouter = require("./routes/generateImagesJson");
-const locationRoutes = require("./routes/locationRoutes");
 const imageEnhancementRouter = require("./routes/imageEnhancement");
 const faceSwapRouter = require("./routes/faceSwap");
 const geminiImageProcessRouter = require("./routes/geminiImageProcess");
@@ -48,6 +46,7 @@ const rankingsRoutes = require("./routes/rankings");
 const styleBattlesRoutes = require("./routes/styleBattles");
 const tournamentRoutes = require("./routes/tournamentRoutes");
 const generateProductNameRouter = require("./routes/generateProductName");
+const poseRoutes = require("./routes/poseRoutes");
 
 // Yeni eklenen route import'ları
 const userProfileRoutes = require("./routes/userProfileRoutes");
@@ -82,6 +81,14 @@ if (!fs.existsSync(outputsDir)) {
   console.log("Outputs directory ready:", outputsDir);
 }
 
+// Poz JSON dosyalarının yollarını kontrol et
+const manPosesPath = path.join(__dirname, "../lib/man_poses.json");
+const womanPosesPath = path.join(__dirname, "../lib/woman_poses.json");
+console.log("Man poses path:", manPosesPath);
+console.log("Woman poses path:", womanPosesPath);
+console.log("Man poses exists:", fs.existsSync(manPosesPath));
+console.log("Woman poses exists:", fs.existsSync(womanPosesPath));
+
 // Basit test endpointi ekle
 app.get("/test", (req, res) => {
   console.log("Test endpoint was called from:", req.ip);
@@ -113,6 +120,9 @@ app.use("/api", virtualTryOnRoutes);
 app.use("/api", outfitsRoutes);
 app.use("/api", inspirationsRoutes);
 
+// Poz rotalarını ekle
+app.use("/api/poses", poseRoutes);
+
 // Mevcut route tanımlamaları
 app.use("/api", backgroundGeneratorRouter);
 app.use("/api/images", imageRoutes);
@@ -137,9 +147,7 @@ app.use("/api", getPredictionsRouter);
 app.use("/api", getBalance);
 app.use("/api", registerAnonymousUserRouter);
 app.use("/api", generateImgToVidRouter);
-app.use("/api", posesRouter);
 app.use("/api", generateImagesJsonRouter);
-app.use("/api", locationRoutes);
 app.use("/api", geminiImageProcessRouter);
 app.use("/api", geminiImageDetectionRouter);
 app.use("/api", imageClarityProcessRouter);
