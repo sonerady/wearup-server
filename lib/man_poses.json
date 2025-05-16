@@ -331,13 +331,6 @@
     "title": "Hand on the back of the neck, looking slightly awkward.",
     "image": "https://egpfenrpripkjpemjxtg.supabase.co/storage/v1/object/public/man_poses/pose_hand_on_neck_awkward.webp"
   },
-
-  {
-    "id": 59,
-    "key": "pose_arms_open_presentation",
-    "title": "Arms open wide as if giving a presentation.",
-    "image": "https://egpfenrpripkjpemjxtg.supabase.co/storage/v1/object/public/man_poses/pose_arms_open_presentation.webp"
-  },
   {
     "id": 60,
     "key": "pose_fist_bump_friendly",

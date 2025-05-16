@@ -49,6 +49,10 @@ const generateProductNameRouter = require("./routes/generateProductName");
 const poseRoutes = require("./routes/poseRoutes");
 // Lokasyon rotalarını import et
 const locationRoutes = require("./routes/locationRoutes");
+// Saç stili rotalarını import et
+const hairStyleRoutes = require("./routes/hairStyleRoutes");
+// Saç rengi rotalarını import et
+const hairColorRoutes = require("./routes/hairColorRoutes");
 
 // Yeni eklenen route import'ları
 const userProfileRoutes = require("./routes/userProfileRoutes");
@@ -126,6 +130,10 @@ app.use("/api", inspirationsRoutes);
 app.use("/api/poses", poseRoutes);
 // Lokasyon rotalarını ekle
 app.use("/api/locations", locationRoutes);
+// Saç stili rotalarını ekle
+app.use("/api/hairstyles", hairStyleRoutes);
+// Saç rengi rotalarını ekle
+app.use("/api/haircolors", hairColorRoutes);
 
 // Mevcut route tanımlamaları
 app.use("/api", backgroundGeneratorRouter);

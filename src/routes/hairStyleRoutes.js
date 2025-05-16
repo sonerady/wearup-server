@@ -4,8 +4,11 @@ const fs = require("fs");
 const path = require("path");
 
 // JSON dosyalarının yolları
-const malePosesPath = path.join(__dirname, "../../lib/man_poses.json");
-const femalePosesPath = path.join(__dirname, "../../lib/woman_poses.json");
+const maleHairStylesPath = path.join(__dirname, "../lib/man_hair_styles.json");
+const femaleHairStylesPath = path.join(
+  __dirname,
+  "../lib/woman_hair_styles.json"
+);
 
 // Resim URL'lerine boyut parametresi ekleyen yardımcı fonksiyon
 const optimizeImageUrl = (imageUrl) => {
@@ -32,106 +35,106 @@ const shuffleArray = (array) => {
 };
 
 // JSON dosyalarını oku
-let malePoses = [];
-let femalePoses = [];
+let maleHairStyles = [];
+let femaleHairStyles = [];
 
 try {
-  const maleData = fs.readFileSync(malePosesPath, "utf8");
-  malePoses = JSON.parse(maleData);
+  const maleData = fs.readFileSync(maleHairStylesPath, "utf8");
+  maleHairStyles = JSON.parse(maleData);
 
   // URL'leri optimize et
-  malePoses = malePoses.map((pose) => ({
-    ...pose,
-    image: optimizeImageUrl(pose.image),
+  maleHairStyles = maleHairStyles.map((style) => ({
+    ...style,
+    image: optimizeImageUrl(style.image),
   }));
 
-  console.log(`${malePoses.length} erkek pozu yüklendi`);
+  console.log(`${maleHairStyles.length} erkek saç stili yüklendi`);
 } catch (error) {
-  console.error("Man poses yüklenirken hata:", error);
+  console.error("Erkek saç stilleri yüklenirken hata:", error);
 }
 
 try {
-  const femaleData = fs.readFileSync(femalePosesPath, "utf8");
-  femalePoses = JSON.parse(femaleData);
+  const femaleData = fs.readFileSync(femaleHairStylesPath, "utf8");
+  femaleHairStyles = JSON.parse(femaleData);
 
   // URL'leri optimize et
-  femalePoses = femalePoses.map((pose) => ({
-    ...pose,
-    image: optimizeImageUrl(pose.image),
+  femaleHairStyles = femaleHairStyles.map((style) => ({
+    ...style,
+    image: optimizeImageUrl(style.image),
   }));
 
-  console.log(`${femalePoses.length} kadın pozu yüklendi`);
+  console.log(`${femaleHairStyles.length} kadın saç stili yüklendi`);
 } catch (error) {
-  console.error("Woman poses yüklenirken hata:", error);
+  console.error("Kadın saç stilleri yüklenirken hata:", error);
 }
 
 // Test endpointi
 router.get("/test", (req, res) => {
   res.json({
     success: true,
-    message: "Poz API çalışıyor",
-    malePosesCount: malePoses.length,
-    femalePosesCount: femalePoses.length,
+    message: "Saç Stilleri API çalışıyor",
+    maleHairStylesCount: maleHairStyles.length,
+    femaleHairStylesCount: femaleHairStyles.length,
   });
 });
 
-// Erkek pozlarını getir
+// Erkek saç stillerini getir
 router.get("/male", (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-
+    
     // Verileri karıştır
-    const shuffledPoses = shuffleArray(malePoses);
+    const shuffledStyles = shuffleArray(maleHairStyles);
 
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
 
-    const paginatedPoses = shuffledPoses.slice(startIndex, endIndex);
+    const paginatedStyles = shuffledStyles.slice(startIndex, endIndex);
 
     res.json({
       success: true,
-      total: malePoses.length,
+      total: maleHairStyles.length,
       page: page,
       limit: limit,
-      hasMore: endIndex < malePoses.length,
-      data: paginatedPoses,
+      hasMore: endIndex < maleHairStyles.length,
+      data: paginatedStyles,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Erkek pozları yüklenirken hata oluştu",
+      message: "Erkek saç stilleri yüklenirken hata oluştu",
       error: error.message,
     });
   }
 });
 
-// Kadın pozlarını getir
+// Kadın saç stillerini getir
 router.get("/female", (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-
+    
     // Verileri karıştır
-    const shuffledPoses = shuffleArray(femalePoses);
+    const shuffledStyles = shuffleArray(femaleHairStyles);
 
     const startIndex = (page - 1) * limit;
     const endIndex = page * limit;
 
-    const paginatedPoses = shuffledPoses.slice(startIndex, endIndex);
+    const paginatedStyles = shuffledStyles.slice(startIndex, endIndex);
 
     res.json({
       success: true,
-      total: femalePoses.length,
+      total: femaleHairStyles.length,
       page: page,
       limit: limit,
-      hasMore: endIndex < femalePoses.length,
-      data: paginatedPoses,
+      hasMore: endIndex < femaleHairStyles.length,
+      data: paginatedStyles,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Kadın pozları yüklenirken hata oluştu",
+      message: "Kadın saç stilleri yüklenirken hata oluştu",
       error: error.message,
     });
   }
