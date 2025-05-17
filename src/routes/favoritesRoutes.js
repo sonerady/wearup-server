@@ -92,11 +92,19 @@ router.get("/favorites/:type", async (req, res) => {
           .order("created_at", { ascending: false }));
         break;
 
+      case "product":
+        ({ data, error } = await supabase
+          .from("product_favorites")
+          .select("*")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false }));
+        break;
+
       default:
         return res.status(400).json({
           success: false,
           message:
-            "Geçersiz favori türü. Geçerli değerler: item, combine, inspiration",
+            "Geçersiz favori türü. Geçerli değerler: item, combine, inspiration, product",
         });
     }
 
@@ -122,14 +130,8 @@ router.get("/favorites/:type", async (req, res) => {
 router.post("/favorites/:type", async (req, res) => {
   try {
     const { type } = req.params;
-    const {
-      userId,
-      itemId,
-      outfitId,
-      inspirationType,
-      inspirationId,
-      inspirationData,
-    } = req.body;
+    const { userId, itemId, outfitId, inspirationId, inspirationData } =
+      req.body;
 
     if (!userId) {
       return res.status(400).json({
@@ -249,21 +251,61 @@ router.post("/favorites/:type", async (req, res) => {
         break;
 
       case "inspiration":
-        if (!inspirationType) {
-          return res.status(400).json({
-            success: false,
-            message: "Inspiration türü gerekli",
-          });
-        }
-
         ({ data, error } = await supabase
           .from("inspiration_favorites")
           .insert([
             {
               user_id: userId,
-              inspiration_type: inspirationType,
               inspiration_id: inspirationId,
-              inspiration_data: inspirationData,
+              inspiration_images: req.body.inspiration_images || null,
+            },
+          ])
+          .select());
+        break;
+
+      case "product":
+        const { productId, productName, productImage, productUrl } = req.body;
+
+        if (!productId) {
+          return res.status(400).json({
+            success: false,
+            message: "Ürün ID'si gerekli",
+          });
+        }
+
+        // Önce ürünün favorilerde olup olmadığını kontrol et
+        try {
+          const { data: existingProduct } = await supabase
+            .from("product_favorites")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("product_id", productId)
+            .maybeSingle();
+
+          if (existingProduct) {
+            return res.status(200).json({
+              success: true,
+              message: "Bu ürün zaten favorilerinizde",
+              data: existingProduct,
+            });
+          }
+        } catch (err) {
+          console.log(
+            "Ürün favorileri kontrol hatası, insert devam ediyor:",
+            err
+          );
+        }
+
+        // Favorilere ekle
+        ({ data, error } = await supabase
+          .from("product_favorites")
+          .insert([
+            {
+              user_id: userId,
+              product_id: productId,
+              product_name: productName,
+              product_image: productImage,
+              product_url: productUrl,
             },
           ])
           .select());
@@ -273,7 +315,7 @@ router.post("/favorites/:type", async (req, res) => {
         return res.status(400).json({
           success: false,
           message:
-            "Geçersiz favori türü. Geçerli değerler: item, combine, inspiration",
+            "Geçersiz favori türü. Geçerli değerler: item, combine, inspiration, product",
         });
     }
 
@@ -284,24 +326,37 @@ router.post("/favorites/:type", async (req, res) => {
 
       // ServiceRole ile direkt SQL çalıştır (bypass FK constraints)
       try {
-        // Bu kısmı service role key ile yapmak gerekir ama bu örnekte kullanmıyoruz
-        const sqlQuery = `
-          INSERT INTO ${type}_favorites (id, user_id, ${
-          type === "item"
-            ? "item_id"
-            : type === "combine"
-            ? "outfit_id"
-            : "inspiration_id"
-        }) 
-          VALUES (uuid_generate_v4(), '${userId}', '${
-          type === "item"
-            ? itemId
-            : type === "combine"
-            ? outfitId
-            : inspirationId
-        }')
-          RETURNING *;
-        `;
+        // İlgili tablo ve sütunlar için SQL sorgusu oluştur
+        let sqlQuery;
+
+        if (type === "inspiration") {
+          sqlQuery = `
+            INSERT INTO ${type}_favorites (id, user_id, inspiration_id, inspiration_images) 
+            VALUES (uuid_generate_v4(), '${userId}', '${inspirationId}', '${
+            req.body.inspiration_images || null
+          }')
+            RETURNING *;
+          `;
+        } else if (type === "product") {
+          const { productId, productName, productImage, productUrl } = req.body;
+          sqlQuery = `
+            INSERT INTO product_favorites (id, user_id, product_id, product_name, product_image, product_url) 
+            VALUES (uuid_generate_v4(), '${userId}', '${productId}', '${
+            productName || ""
+          }', '${productImage || ""}', '${productUrl || ""}')
+            RETURNING *;
+          `;
+        } else {
+          sqlQuery = `
+            INSERT INTO ${type}_favorites (id, user_id, ${
+            type === "item" ? "item_id" : "outfit_id"
+          }) 
+            VALUES (uuid_generate_v4(), '${userId}', '${
+            type === "item" ? itemId : outfitId
+          }')
+            RETURNING *;
+          `;
+        }
 
         const { data: sqlData, error: sqlError } = await supabase.rpc(
           "execute_sql",
@@ -329,8 +384,14 @@ router.post("/favorites/:type", async (req, res) => {
         if (type === "combine") mockData.outfit_id = outfitId;
         if (type === "inspiration") {
           mockData.inspiration_id = inspirationId;
-          mockData.inspiration_type = inspirationType;
-          mockData.inspiration_data = inspirationData;
+          mockData.inspiration_images = req.body.inspiration_images || null;
+        }
+        if (type === "product") {
+          const { productId, productName, productImage, productUrl } = req.body;
+          mockData.product_id = productId;
+          mockData.product_name = productName || "";
+          mockData.product_image = productImage || "";
+          mockData.product_url = productUrl || "";
         }
 
         data = [mockData];
@@ -478,11 +539,24 @@ router.get("/favorites/:type/check", async (req, res) => {
         idValue = inspirationId;
         break;
 
+      case "product":
+        const productId = req.query.productId;
+        if (!productId) {
+          return res.status(400).json({
+            success: false,
+            message: "Product ID gerekli",
+          });
+        }
+        tableToUse = "product_favorites";
+        idField = "product_id";
+        idValue = productId;
+        break;
+
       default:
         return res.status(400).json({
           success: false,
           message:
-            "Geçersiz favori türü. Geçerli değerler: item, combine, inspiration",
+            "Geçersiz favori türü. Geçerli değerler: item, combine, inspiration, product",
         });
     }
 

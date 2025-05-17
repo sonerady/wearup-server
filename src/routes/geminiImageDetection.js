@@ -343,6 +343,7 @@ router.post("/analyze-clothing-url", async (req, res) => {
 
       if (jsonMatch) {
         clothingItems = JSON.parse(jsonMatch[0]);
+        console.log("JSON extracted successfully from response");
       } else {
         throw new Error("JSON format not found in response");
       }
@@ -353,10 +354,14 @@ router.post("/analyze-clothing-url", async (req, res) => {
       try {
         // Try parsing the entire response
         clothingItems = JSON.parse(responseText);
+        console.log("Parsed complete response as JSON");
       } catch (e) {
         console.error("Failed to parse entire response:", e);
 
         // Return the text response for manual parsing on client if needed
+        // Clean up the temporary upload file
+        await unlinkAsync(imagePath);
+
         return res.status(200).json({
           success: true,
           message: "Image analysis completed but structured parsing failed",
@@ -366,7 +371,7 @@ router.post("/analyze-clothing-url", async (req, res) => {
     }
 
     // Validate and filter clothing items to ensure each has both type and query fields
-    clothingItems = clothingItems.filter((item) => {
+    const validItems = clothingItems.filter((item) => {
       if (
         !item.type ||
         !item.query ||
@@ -382,9 +387,14 @@ router.post("/analyze-clothing-url", async (req, res) => {
       return true;
     });
 
+    console.log(`Found ${validItems.length} valid clothing items`);
+
     // If all items were filtered out, return an error
-    if (clothingItems.length === 0) {
+    if (validItems.length === 0) {
       console.log("All clothing items were invalid or incomplete");
+      // Clean up the temporary upload file
+      await unlinkAsync(imagePath);
+
       return res.status(500).json({
         success: false,
         error: "Failed to analyze image properly",
@@ -399,13 +409,13 @@ router.post("/analyze-clothing-url", async (req, res) => {
     // Return successful response to client
     console.log(
       "Returning successful response with",
-      clothingItems.length,
+      validItems.length,
       "clothing items"
     );
     return res.status(200).json({
       success: true,
       message: "Clothing items analyzed successfully",
-      clothingItems: clothingItems,
+      clothingItems: validItems,
       country: country,
       language: language,
     });
