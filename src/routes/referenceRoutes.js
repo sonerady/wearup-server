@@ -1,11 +1,95 @@
 const express = require("express");
 const router = express.Router();
 const RunwayML = require("@runwayml/sdk");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// Gemini API için istemci oluştur
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+// Prompt'u iyileştirmek için Gemini'yi kullan
+async function enhancePromptWithGemini(
+  originalPrompt,
+  referenceImages,
+  settings = {}
+) {
+  try {
+    console.log("Gemini ile prompt iyileştirme başlatılıyor");
+
+    // Referans görsellerden tag listesi oluştur
+    const imageTags = referenceImages.map((img) => img.tag).filter(Boolean);
+
+    // Gemini modeli
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    // Kullanıcının seçtiği ayarlardan bir metin oluşturalım
+    const settingsText = Object.entries(settings)
+      .filter(([key, value]) => value) // Boş değerleri filtrele
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(", ");
+
+    // Gemini'ye gönderilecek metin
+    let promptForGemini = `
+    The following is an original prompt from a user: "${originalPrompt}"
+    
+    Reference image tags: ${imageTags.join(", ")}
+    
+    User selected settings: ${settingsText || "None"}
+    
+    This original prompt could be in any language since it comes directly from a client-side user input. The prompt may already contain references to images with their actual names (which could be anything, not just "img_1" or "img_2").
+    
+    I need you to:
+    1. Convert this prompt to English if it's not already in English
+    2. Enhance and rewrite it using proper prompt engineering techniques to be more effective for an AI image generator
+    3. Keep any existing image references intact exactly as they appear in the original prompt
+    4. If there are image names from the reference image tags list that are not already prefixed with @ in the prompt, add the @ symbol before them
+    5. Incorporate all the user settings to enhance the prompt. For example:
+       - If season is "Winter", add details about snow, cold weather, or winter clothing
+       - If location is "Beach", describe a beach setting with sand, ocean, and relevant elements
+       - If hairStyle or hairColor is selected, emphasize these features in the description
+       - If mood is specified, adjust the tone of the description accordingly
+    
+    IMPORTANT: The @ symbol indicates that the text following it is the actual name of a reference image. These names can be anything (not just "img_1", "img_2") and should be preserved exactly as they appear in the tags list.
+    
+    Your output should only be the enhanced prompt in English, without any explanations or additional text. Maintain all image references from the original prompt with the @ prefix.
+    `;
+
+    console.log("Gemini'ye gönderilen istek:", promptForGemini);
+
+    // Gemini'den cevap al
+    const result = await model.generateContent(promptForGemini);
+    let enhancedPrompt = result.response.text().trim();
+
+    console.log("Gemini'nin ilk ürettiği prompt:", enhancedPrompt);
+
+    // Güvenlik kontrolü: Eğer Gemini tag'lerin başına @ eklemediyse manuel olarak ekleyelim
+    if (imageTags.length > 0) {
+      // Her bir image tag için kontrol
+      imageTags.forEach((tag) => {
+        // Eğer tag prompt içinde varsa ve başında @ yoksa
+        const tagRegex = new RegExp(`(?<!@)\\b${tag}\\b`, "g");
+        if (tagRegex.test(enhancedPrompt)) {
+          enhancedPrompt = enhancedPrompt.replace(tagRegex, `@${tag}`);
+        }
+      });
+    }
+
+    console.log(
+      "Gemini tarafından iyileştirilmiş ve @ kontrolü yapılmış prompt:",
+      enhancedPrompt
+    );
+
+    return enhancedPrompt;
+  } catch (error) {
+    console.error("Prompt iyileştirme hatası:", error);
+    // Hata durumunda orijinal prompt'u döndür
+    return originalPrompt;
+  }
+}
 
 // RunwayML client'ı oluştur
 router.post("/generate", async (req, res) => {
   try {
-    const { ratio, promptText, referenceImages } = req.body;
+    const { ratio, promptText, referenceImages, settings } = req.body;
 
     if (
       !promptText ||
@@ -22,21 +106,40 @@ router.post("/generate", async (req, res) => {
       });
     }
 
+    // Kullanıcının prompt'unu Gemini ile iyileştir - settings parametresi de ekledik
+    const enhancedPrompt = await enhancePromptWithGemini(
+      promptText,
+      referenceImages,
+      settings || {} // settings yoksa boş obje gönder
+    );
+
     // RunwayML client oluştur
     const client = new RunwayML({ apiKey: process.env.RUNWAY_API_KEY });
 
+    // Özet bilgileri logla
     console.log("Resim oluşturma isteği başlatılıyor:", {
       model: "gen4_image",
       ratio: ratio || "1080:1920",
-      promptText,
+      promptText: enhancedPrompt, // İyileştirilmiş prompt'u kullan
       referenceImagesCount: referenceImages.length,
+    });
+
+    // RunwayML'e gönderilen tam veri yapısını logla
+    console.log("RunwayML'e gönderilen tam veri yapısı:", {
+      model: "gen4_image",
+      ratio: ratio || "1080:1920",
+      promptText: enhancedPrompt,
+      referenceImages: referenceImages.map((img) => ({
+        uri: img.uri,
+        tag: img.tag,
+      })),
     });
 
     // Resim oluşturma görevi oluştur
     let task = await client.textToImage.create({
       model: "gen4_image",
       ratio: ratio || "1080:1920",
-      promptText,
+      promptText: enhancedPrompt, // İyileştirilmiş prompt'u kullan
       referenceImages,
     });
 
@@ -66,6 +169,8 @@ router.post("/generate", async (req, res) => {
         result: {
           task,
           imageUrl: task.output[0],
+          originalPrompt: promptText,
+          enhancedPrompt: enhancedPrompt,
         },
       });
     } else if (task.status === "FAILED") {
@@ -117,13 +222,20 @@ router.get("/test", async (req, res) => {
       },
     ];
 
+    // Test için prompt'u iyileştir
+    const enhancedTestPrompt = await enhancePromptWithGemini(
+      testPrompt,
+      testReferenceImages
+    );
+    console.log("İyileştirilmiş test promptu:", enhancedTestPrompt);
+
     console.log("Test işlemi başlatılıyor");
 
     // Resim oluşturma görevi oluştur
     let task = await client.textToImage.create({
       model: "gen4_image",
       ratio: "1080:1920",
-      promptText: testPrompt,
+      promptText: enhancedTestPrompt, // İyileştirilmiş prompt'u kullan
       referenceImages: testReferenceImages,
     });
 
@@ -152,6 +264,8 @@ router.get("/test", async (req, res) => {
         result: {
           task,
           imageUrl: task.output[0],
+          originalPrompt: testPrompt,
+          enhancedPrompt: enhancedTestPrompt,
         },
       });
     } else if (task.status === "FAILED") {
