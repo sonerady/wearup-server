@@ -609,6 +609,7 @@ router.post("/wardrobe", upload.single("image"), async (req, res) => {
       purchaseDate,
       tags,
       visibility,
+      currency, // Para birimi değerini dahil et
     } = req.body;
 
     if (!userId || !itemName || !category) {
@@ -781,6 +782,7 @@ router.post("/wardrobe", upload.single("image"), async (req, res) => {
         style: req.body.style || null,
         product_gender:
           req.body.productGender || req.body.product_gender || null,
+        currency: req.body.currency || "TRY", // Frontend'den gelen currency'yi kullan, yoksa TRY
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -2417,6 +2419,7 @@ router.post(
             visibility,
             processedImageUri, // İşlenmiş resim URL'si
             image_url, // Alternatif alan adı
+            currency, // Para birimi
           } = item;
 
           console.log(`Ürün ${i + 1} işleniyor:`, {
@@ -2560,6 +2563,7 @@ router.post(
             material: item.material || null, // Materyal bilgisini ekle
             style: item.style || null, // Stil bilgisini ekle
             product_gender: item.productGender || item.product_gender || null, // Ürün cinsiyet bilgisini ekle
+            currency: item.currency || "TRY", // Para birimi bilgisini ekle, yoksa varsayılan TRY
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
