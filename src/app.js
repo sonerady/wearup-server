@@ -17,6 +17,7 @@ const updateCreditRouter = require("./routes/updateCredit");
 const getUserRouter = require("./routes/getUser");
 const notificationRoutes = require("./routes/notificationRoutes");
 const addProductRouter = require("./routes/addProduct");
+const plannerRoutes = require("./routes/plannerRoutes");
 const getUserProductRouter = require("./routes/getUserProduct");
 const uploadImageRouter = require("./routes/uploadImage");
 const checkStatusRouter = require("./routes/checkStatus");
@@ -174,7 +175,7 @@ app.use("/api", combineImageRoutes);
 app.use("/api/pinterest", pinterestRoutes);
 app.use("/api", rankingsRoutes);
 app.use("/api", styleBattlesRoutes);
-
+app.use("/api/planner", plannerRoutes);
 app.use("/api/style-battles", styleBattlesRoutes);
 app.use("/api/rankings", rankingsRoutes);
 app.use("/api/tournaments", tournamentRoutes);
