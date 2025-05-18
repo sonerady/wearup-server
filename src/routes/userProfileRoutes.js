@@ -205,4 +205,143 @@ router.post("/update-counters", async (req, res) => {
   }
 });
 
+// Profil görünürlüğünü güncelleme
+router.put("/profile/update-visibility", async (req, res) => {
+  try {
+    const { userId, visibility } = req.body;
+    console.log("Görünürlük güncelleme isteği:", req.body);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID'si gereklidir",
+      });
+    }
+
+    if (!visibility || (visibility !== "public" && visibility !== "private")) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Geçerli bir görünürlük değeri gereklidir (public veya private)",
+      });
+    }
+
+    // Önce kullanıcının var olup olmadığını kontrol et
+    const { data: existingUser, error: checkError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
+
+    if (checkError) {
+      console.error("Kullanıcı kontrolü hatası:", checkError);
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+        error: checkError.message,
+      });
+    }
+
+    // Kullanıcının görünürlük ayarını güncelle
+    const { data, error } = await supabase
+      .from("users")
+      .update({ visibility })
+      .eq("id", userId)
+      .select();
+
+    if (error) {
+      console.error("Görünürlük güncelleme DB hatası:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Görünürlük ayarı güncellenemedi",
+        error: error.message,
+        details: "Veritabanında 'visibility' alanının eklendiğinden emin olun",
+      });
+    }
+
+    console.log("Görünürlük güncelleme başarılı:", data);
+    return res.status(200).json({
+      success: true,
+      message: "Görünürlük ayarı başarıyla güncellendi",
+      profile: data[0],
+    });
+  } catch (error) {
+    console.error("Görünürlük güncelleme hatası (catch):", error);
+    return res.status(500).json({
+      success: false,
+      message: "Sunucu hatası",
+      error: error.message,
+      stack: error.stack,
+    });
+  }
+});
+
+// Kapak resmi yükleme
+router.post("/profile/upload-cover", async (req, res) => {
+  try {
+    const { userId, file, filename } = req.body;
+
+    if (!userId || !file) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID'si ve dosya gereklidir",
+      });
+    }
+
+    const fileExt = filename.split(".").pop();
+    const filePath = `covers/${userId}-${Date.now()}.${fileExt}`;
+
+    // Kapak resmini Storage'a yükle
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from("profiles")
+      .upload(filePath, Buffer.from(file, "base64"), {
+        contentType: `image/${fileExt}`,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      return res.status(500).json({
+        success: false,
+        message: "Kapak resmi yüklenemedi",
+        error: uploadError.message,
+      });
+    }
+
+    // Yüklenen resmin public URL'ini al
+    const { data: urlData } = supabase.storage
+      .from("profiles")
+      .getPublicUrl(filePath);
+
+    const publicUrl = urlData.publicUrl;
+
+    // Kullanıcının cover_image_url bilgisini güncelle
+    const { data: updateData, error: updateError } = await supabase
+      .from("users")
+      .update({ cover_image_url: publicUrl })
+      .eq("id", userId)
+      .select();
+
+    if (updateError) {
+      return res.status(500).json({
+        success: false,
+        message: "Kapak resmi bilgisi güncellenemedi",
+        error: updateError.message,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Kapak resmi başarıyla güncellendi",
+      cover_image_url: publicUrl,
+    });
+  } catch (error) {
+    console.error("Kapak resmi yükleme hatası:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Sunucu hatası",
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;
