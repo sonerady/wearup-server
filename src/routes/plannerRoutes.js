@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const supabase = require("../lib/supabaseClient"); // Bir önceki adımda oluşturduğumuz client
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage() });
 
 // Helper function to get user_id from request (assuming it's passed in query or body)
 // You might have a middleware for this already if using actual auth
@@ -28,13 +30,11 @@ router.get("/events", async (req, res) => {
     res.json({ success: true, data });
   } catch (error) {
     console.error("Error fetching planner events:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch planner events",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch planner events",
+      error: error.message,
+    });
   }
 });
 
@@ -52,12 +52,10 @@ router.post("/events", async (req, res) => {
   } = req.body;
 
   if (!userId || !title || !type || !event_date) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Missing required fields (userId, title, type, event_date)",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "Missing required fields (userId, title, type, event_date)",
+    });
   }
 
   try {
@@ -81,13 +79,11 @@ router.post("/events", async (req, res) => {
     res.status(201).json({ success: true, data: data[0] });
   } catch (error) {
     console.error("Error creating planner event:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to create planner event",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to create planner event",
+      error: error.message,
+    });
   }
 });
 
@@ -128,23 +124,19 @@ router.put("/events/:eventId", async (req, res) => {
 
     if (error) throw error;
     if (!data || data.length === 0) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Event not found or user unauthorized to update",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Event not found or user unauthorized to update",
+      });
     }
     res.json({ success: true, data: data[0] });
   } catch (error) {
     console.error("Error updating planner event:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to update planner event",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update planner event",
+      error: error.message,
+    });
   }
 });
 
@@ -175,14 +167,66 @@ router.delete("/events/:eventId", async (req, res) => {
     res.json({ success: true, message: "Event deleted successfully" });
   } catch (error) {
     console.error("Error deleting planner event:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to delete planner event",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete planner event",
+      error: error.message,
+    });
   }
 });
+
+// POST /api/planner/upload-images (multipart/form-data)
+router.post("/upload-images", upload.array("images", 10), async (req, res) => {
+  const { userId } = req.body;
+  const files = req.files;
+
+  if (!userId || !files || files.length === 0) {
+    return res
+      .status(400)
+      .json({
+        success: false,
+        message: "userId ve images dosya dizisi gereklidir",
+      });
+  }
+
+  try {
+    const uploadPromises = files.map(async (file) => {
+      try {
+        const ext = file.mimetype.includes("png") ? "png" : "jpg";
+        const fileName = `${userId}/${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(2, 8)}.${ext}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from("events")
+          .upload(fileName, file.buffer, {
+            contentType: file.mimetype,
+            upsert: false,
+          });
+
+        if (uploadErr) throw uploadErr;
+
+        const { data: publicUrlData } = supabase.storage
+          .from("events")
+          .getPublicUrl(fileName);
+
+        return publicUrlData.publicUrl;
+      } catch (err) {
+        console.error("Image upload error:", err);
+        return null;
+      }
+    });
+
+    const urls = (await Promise.all(uploadPromises)).filter(Boolean);
+    return res.json({ success: true, urls });
+  } catch (err) {
+    console.error("upload-images route error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Upload failed", error: err.message });
+  }
+});
+
+// ------------------------------
 
 module.exports = router;
