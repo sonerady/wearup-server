@@ -3,6 +3,11 @@ const router = express.Router();
 const RunwayML = require("@runwayml/sdk");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { createClient } = require("@supabase/supabase-js");
+const got = require("got");
+const sharp = require("sharp");
+const fs = require("fs");
+const path = require("path");
+const { v4: uuidv4 } = require("uuid");
 
 // Supabase istemci oluştur
 const supabaseUrl =
@@ -10,6 +15,99 @@ const supabaseUrl =
 const supabaseKey =
   process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Görüntülerin geçici olarak saklanacağı klasörü oluştur
+const tempDir = path.join(__dirname, "../../temp");
+if (!fs.existsSync(tempDir)) {
+  fs.mkdirSync(tempDir, { recursive: true });
+}
+
+// Görüntü normalleştirme fonksiyonu
+async function normalizeImage(imageUrl) {
+  try {
+    console.log(`Görüntü normalize ediliyor: ${imageUrl}`);
+
+    // URL'den görüntüyü indir
+    const buffer = await got(imageUrl).buffer();
+
+    // Görüntü bilgilerini al
+    const metadata = await sharp(buffer).metadata();
+    const { width, height } = metadata;
+    const ratio = width / height;
+
+    console.log(
+      `Orijinal görüntü boyutu: ${width}x${height}, oran: ${ratio.toFixed(3)}`
+    );
+
+    // Oranı kontrol et ve gerekirse düzelt
+    let outputBuffer;
+
+    if (ratio < 0.5) {
+      // Çok dar görüntü (width çok küçük) - genişliği arttır
+      const targetWidth = Math.ceil(height * 0.5);
+      console.log(`Görüntü çok dar. Yeni boyut: ${targetWidth}x${height}`);
+
+      outputBuffer = await sharp(buffer)
+        .resize(targetWidth, height, {
+          fit: "contain",
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        })
+        .toBuffer();
+    } else if (ratio > 2.0) {
+      // Çok geniş görüntü (height çok küçük) - yüksekliği arttır
+      const targetHeight = Math.ceil(width / 2);
+      console.log(`Görüntü çok geniş. Yeni boyut: ${width}x${targetHeight}`);
+
+      outputBuffer = await sharp(buffer)
+        .resize(width, targetHeight, {
+          fit: "contain",
+          background: { r: 255, g: 255, b: 255, alpha: 1 },
+        })
+        .toBuffer();
+    } else {
+      // Oran zaten geçerli
+      console.log("Görüntü oranı zaten geçerli, değişiklik yapılmadı.");
+      outputBuffer = buffer;
+    }
+
+    // Normalize edilmiş görüntüyü geçici dosyaya kaydet
+    const fileName = `normalized_${uuidv4()}.png`;
+    const filePath = path.join(tempDir, fileName);
+
+    await fs.promises.writeFile(filePath, outputBuffer);
+
+    // Supabase'e yükle
+    const remotePath = `normalized/${fileName}`;
+    const { data, error } = await supabase.storage
+      .from("reference")
+      .upload(remotePath, outputBuffer, {
+        contentType: "image/png",
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Normalize edilmiş görüntü yükleme hatası:", error);
+      throw error;
+    }
+
+    // Public URL al
+    const { data: publicUrlData } = supabase.storage
+      .from("reference")
+      .getPublicUrl(remotePath);
+
+    // Geçici dosyayı sil
+    fs.promises
+      .unlink(filePath)
+      .catch((err) => console.warn("Geçici dosya silinemedi:", err));
+
+    // Public URL'i döndür
+    return publicUrlData.publicUrl;
+  } catch (error) {
+    console.error("Görüntü normalize edilirken hata:", error);
+    // Hata durumunda orijinal URL'i döndür
+    return imageUrl;
+  }
+}
 
 // Görsel oluşturma sonuçlarını veritabanına kaydetme fonksiyonu
 async function saveGenerationToDatabase(
@@ -241,15 +339,32 @@ router.post("/generate", async (req, res) => {
     }
 
     // Referans görsellerinin oran doğrulaması
-    // RunwayML, görsellerin width/height oranının 0.5 ile 2 arasında olmasını bekliyor
-    // Bu kontrolü yapmak için server'da oran testi yapamıyoruz, ancak
-    // Client'ta yaptığımız kontrolü burada hatırlatma olarak ekliyoruz
     console.log(
-      `${referenceImages.length} adet referans görsel alındı. Client tarafında oran kontrolü yapılmış olmalı.`
+      `${referenceImages.length} adet referans görsel alındı. Server tarafında normalize edilecek.`
     );
-    console.log(
-      "RunwayML, referans görsellerin en-boy oranının 0.5 ile 2 arasında olmasını bekliyor."
-    );
+
+    // Tüm görselleri normalize et
+    const normalizedImages = [];
+    for (const img of referenceImages) {
+      try {
+        // Görseli normalize et
+        const normalizedUrl = await normalizeImage(img.uri);
+
+        // Normalize edilmiş görseli diziye ekle
+        normalizedImages.push({
+          uri: normalizedUrl,
+          tag: img.tag,
+        });
+
+        console.log(`Görsel normalize edildi: ${img.tag}`);
+      } catch (error) {
+        console.error(`Görsel normalize edilemedi: ${img.tag}`, error);
+        // Hata durumunda orijinal görseli kullan
+        normalizedImages.push(img);
+      }
+    }
+
+    console.log(`${normalizedImages.length} adet görsel normalize edildi.`);
 
     // Ratio'yu formatla
     const formattedRatio = formatRatio(ratio || "1080:1920");
@@ -260,7 +375,7 @@ router.post("/generate", async (req, res) => {
     // Kullanıcının prompt'unu Gemini ile iyileştir - settings parametresi de ekledik
     const enhancedPrompt = await enhancePromptWithGemini(
       promptText,
-      referenceImages,
+      normalizedImages, // Normalize edilmiş görselleri kullan
       settings || {} // settings yoksa boş obje gönder
     );
 
@@ -272,7 +387,7 @@ router.post("/generate", async (req, res) => {
       model: "gen4_image",
       ratio: formattedRatio,
       promptText: enhancedPrompt, // İyileştirilmiş prompt'u kullan
-      referenceImagesCount: referenceImages.length,
+      referenceImagesCount: normalizedImages.length,
     });
 
     // RunwayML'e gönderilen tam veri yapısını logla
@@ -280,7 +395,7 @@ router.post("/generate", async (req, res) => {
       model: "gen4_image",
       ratio: formattedRatio,
       promptText: enhancedPrompt,
-      referenceImages: referenceImages.map((img) => ({
+      referenceImages: normalizedImages.map((img) => ({
         uri: img.uri,
         tag: img.tag,
       })),
@@ -291,7 +406,7 @@ router.post("/generate", async (req, res) => {
       model: "gen4_image",
       ratio: formattedRatio,
       promptText: enhancedPrompt, // İyileştirilmiş prompt'u kullan
-      referenceImages,
+      referenceImages: normalizedImages, // Normalize edilmiş görselleri kullan
     });
 
     console.log("Görev başlatıldı, görev ID:", task.id);
@@ -332,7 +447,7 @@ router.post("/generate", async (req, res) => {
         userId,
         responseData,
         promptText,
-        referenceImages
+        normalizedImages
       );
 
       return res.status(200).json(responseData);
