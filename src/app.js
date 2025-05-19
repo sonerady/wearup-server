@@ -64,6 +64,9 @@ const authRoutes = require("./routes/authRoutes");
 // RevenueCat webhook route import
 const revenuecatWebhookRouter = require("./routes/revenuecatWebhook");
 
+// Route modüllerini içe aktarma
+const exploreRoutes = require("./routes/exploreRoutes");
+
 const app = express();
 
 // CORS ayarlarını daha esnek hale getir
@@ -139,6 +142,7 @@ app.use("/api/hairstyles", hairStyleRoutes);
 app.use("/api/haircolors", hairColorRoutes);
 // Referans görsel oluşturma rotalarını ekle
 app.use("/api/reference", referenceRoutes);
+app.use("/api/reference", exploreRoutes);
 
 // Mevcut route tanımlamaları
 app.use("/api", backgroundGeneratorRouter);
