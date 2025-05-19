@@ -92,7 +92,7 @@ router.post(
          - "27": "Tayt" (Leggings)
          
       2. Distinctive features or a brief description of the item.
-      3. The main color(s) of the item.
+      3. The main color(s) of the item. Return ONLY standard CSS color names like "red", "blue", "green", "black", "white", "gray", "yellow", "orange", "purple", "pink", "brown", "navy", "teal", "olive", "maroon". If there are multiple colors, separate them with commas WITHOUT spaces (e.g., "red,blue,black").
       4. Suitable seasons for the item (Return as a list like ["İlkbahar", "Yaz"] or ["Tüm Mevsimler"]).
       5. Relevant tags (Return as a comma-separated string like "casual, cotton, comfortable").
       6. The material of the item (e.g., "Cotton", "Polyester", "Wool"). Always provide a best guess, do not state "Unknown".

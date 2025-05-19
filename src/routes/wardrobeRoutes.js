@@ -222,11 +222,12 @@ router.get("/wardrobe/outfits", async (req, res) => {
     const offset = (page - 1) * limit;
     console.log("userIdddd", userId);
 
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "Kullanıcı ID'si gerekli",
-      });
+    // userId parametresi verilmediyse tüm public outfitleri getir
+    const fetchAllPublic = !userId;
+    if (fetchAllPublic) {
+      console.log("Tüm public outfitler getiriliyor...");
+    } else {
+      console.log(`Kullanıcı ${userId} için outfitler getiriliyor...`);
     }
 
     try {
@@ -234,7 +235,11 @@ router.get("/wardrobe/outfits", async (req, res) => {
       const { data: tables, error: tableError } = await supabase
         .from("wardrobe_outfits")
         .select("*")
-        .eq("user_id", userId);
+        .eq(
+          fetchAllPublic ? "visibility" : "user_id",
+          fetchAllPublic ? "public" : userId
+        )
+        .limit(1);
 
       console.log("tablessss", tables);
 
@@ -265,14 +270,8 @@ router.get("/wardrobe/outfits", async (req, res) => {
 
       // Foreign key ilişkisini kullanarak wardrobe_outfits ve users tablolarını birleştir
       // users tablosundan username ve avatar_url bilgilerini de getir
-      const {
-        data: outfits,
-        error: outfitsError,
-        count,
-      } = await supabase
-        .from("wardrobe_outfits")
-        .select(
-          `
+      let query = supabase.from("wardrobe_outfits").select(
+        `
           *,
           users:user_id (
             id,
@@ -280,9 +279,23 @@ router.get("/wardrobe/outfits", async (req, res) => {
             avatar_url
           )
         `,
-          { count: "exact" }
-        )
-        .eq("user_id", userId)
+        { count: "exact" }
+      );
+
+      // Eğer userId verilmişse, kullanıcının kendi outfitlerini getir
+      // Aksi halde tüm public outfitleri getir
+      if (!fetchAllPublic) {
+        query = query.eq("user_id", userId);
+      } else {
+        // Public outfitleri getir
+        query = query.eq("visibility", "public");
+      }
+
+      const {
+        data: outfits,
+        error: outfitsError,
+        count,
+      } = await query
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -1000,7 +1013,6 @@ router.post("/outfit", async (req, res) => {
           user_id: userId,
           name: name || `Outfit ${new Date().toLocaleDateString()}`,
           item_ids: items,
-          visibility: visibility || "private",
           created_at: new Date().toISOString(),
         },
       ])

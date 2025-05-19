@@ -344,4 +344,108 @@ router.post("/profile/upload-cover", async (req, res) => {
   }
 });
 
+// Kullanıcı adı kullanılabilirliğini kontrol et
+router.get("/check-username", async (req, res) => {
+  try {
+    const { username } = req.query;
+
+    if (!username) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı adı parametresi gereklidir",
+      });
+    }
+
+    // Kullanıcı adının minimum uzunluğu kontrolü
+    if (username.length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı adı en az 3 karakter olmalıdır",
+        exists: false,
+        valid: false,
+      });
+    }
+
+    // Kullanıcı adının veritabanında olup olmadığını kontrol et
+    const { data, error } = await supabase
+      .from("users")
+      .select("username")
+      .eq("username", username)
+      .limit(1);
+
+    if (error) {
+      console.error("Kullanıcı adı kontrolü veritabanı hatası:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Veritabanı hatası",
+        error: error.message,
+      });
+    }
+
+    // Sonucu döndür
+    return res.status(200).json({
+      success: true,
+      exists: data && data.length > 0,
+      valid: true,
+    });
+  } catch (error) {
+    console.error("Kullanıcı adı kontrolü hatası:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Sunucu hatası",
+      error: error.message,
+    });
+  }
+});
+
+// Kullanıcı hesabını devre dışı bırakma
+router.delete("/profile/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID'si gereklidir",
+      });
+    }
+
+    // Önce kullanıcının var olup olmadığını kontrol et
+    const { data: existingUser, error: checkError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
+
+    if (checkError || !existingUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    // Kullanıcının active durumunu false yap
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ active: false })
+      .eq("id", userId);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Kullanıcı hesabı başarıyla devre dışı bırakıldı",
+    });
+  } catch (error) {
+    console.error("Kullanıcı devre dışı bırakma hatası:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Kullanıcı devre dışı bırakılırken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;
