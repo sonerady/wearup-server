@@ -1,3 +1,6 @@
+// Fetch API düzeltmesini yükle
+require("./fix-fetch");
+
 // app.js
 const express = require("express");
 const cors = require("cors");
@@ -120,6 +123,16 @@ app.get("/api/status", (req, res) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Düzeltme: Node.js 18+ için global fetch fonksiyonunu düzelt
+const originalFetch = global.fetch;
+global.fetch = (url, opts = {}) => {
+  // Eğer bir body varsa ve duplex belirtilmediyse, 'half' ekle
+  if (opts.body && !opts.duplex) {
+    opts.duplex = "half";
+  }
+  return originalFetch(url, opts);
+};
 
 // Önemli: Router sıralaması kritiktir. Özel endpoint'leri önce tanımlayın!
 // Yeni eklenen auth ve profile rotalarını önce tanımlayın

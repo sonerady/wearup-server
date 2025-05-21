@@ -5,12 +5,15 @@ const multer = require("multer");
 const upload = multer();
 const axios = require("axios");
 const dotenv = require("dotenv");
+const path = require("path");
+const fs = require("fs");
+const FormData = require("form-data");
 
 // .env dosyasını yükle
 dotenv.config();
 
-// Replicate API token'ı al
-const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
+// PhotoRoom API anahtarını al
+const PHOTOROOM_API_KEY = process.env.PHOTOROOM_API_KEY;
 
 // Replicate URL'yi Supabase'e yükleyip yeni URL döndüren yardımcı fonksiyon
 const uploadReplicateUrlToSupabase = async (replicateUrl) => {
@@ -1182,76 +1185,95 @@ router.post("/wardrobe/outfits/remove-background", async (req, res) => {
           `Arkaplan kaldırma işlemi başlıyor: ${imageUrl.substring(0, 50)}...`
         );
 
-        // Replicate API'ye istek at
-        const response = await axios.post(
-          "https://api.replicate.com/v1/predictions",
-          {
-            version:
-              "37ff2aa89897c0de4a140a3d50969dc62b663ea467e1e2bde18008e3d3731b2b",
-            input: {
-              image: imageUrl,
-            },
-          },
+        // Görüntüyü indir
+        const imageResponse = await axios.get(imageUrl, {
+          responseType: "arraybuffer",
+        });
+
+        // FormData oluştur
+        const formData = new FormData();
+        const buffer = Buffer.from(imageResponse.data);
+
+        // FormData'ya imageFile ekle
+        formData.append("image_file", buffer, {
+          filename: "image.jpg",
+          contentType: imageResponse.headers["content-type"] || "image/jpeg",
+        });
+
+        // Parametreleri ekle
+        formData.append("crop", "true");
+        formData.append("format", "png");
+        formData.append("size", "hd");
+
+        // PhotoRoom API'ye istek at
+        console.log(`PhotoRoom API'ye istek atılıyor...`);
+        const photoRoomResponse = await axios.post(
+          "https://sdk.photoroom.com/v1/segment",
+          formData,
           {
             headers: {
-              Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
-              "Content-Type": "application/json",
-              Prefer: "wait",
+              "x-api-key": PHOTOROOM_API_KEY,
+              ...formData.getHeaders(),
             },
+            responseType: "arraybuffer",
           }
         );
 
-        console.log(`Replicate API yanıtı:`, response.data);
+        console.log(`PhotoRoom API yanıtı alındı: ${photoRoomResponse.status}`);
 
-        // API işlemi tamamlanana kadar bekleyen bir işlem döndürdüyse takip et
-        let predictionResult = response.data;
-
-        // Status "succeeded" olana kadar veya maksimum deneme sayısına ulaşana kadar bekle
-        let maxAttempts = 15; // Daha uzun sürebilir, bu yüzden maksimum deneme sayısını arttırdık
-        let attempts = 0;
-
-        while (
-          predictionResult.status !== "succeeded" &&
-          attempts < maxAttempts
-        ) {
-          // 2 saniye bekle
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-
-          // Durumu kontrol et
-          const statusResponse = await axios.get(
-            `https://api.replicate.com/v1/predictions/${predictionResult.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
-              },
-            }
-          );
-
-          predictionResult = statusResponse.data;
-          attempts++;
-
-          console.log(
-            `Tahmin durumu (${attempts}/${maxAttempts}):`,
-            predictionResult.status
-          );
+        if (photoRoomResponse.status !== 200) {
+          throw new Error(`PhotoRoom API hatası: ${photoRoomResponse.status}`);
         }
+
+        // İşlenen resmi geçici olarak kaydet
+        const fileName = `temp_${Date.now()}_${Math.random()
+          .toString(36)
+          .substring(2, 10)}.png`;
+        const filePath = path.join(__dirname, "../../temp", fileName);
+
+        // Temp klasörünün varlığını kontrol et ve yoksa oluştur
+        const tempDir = path.join(__dirname, "../../temp");
+        if (!fs.existsSync(tempDir)) {
+          fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        // Dosyayı kaydet
+        fs.writeFileSync(filePath, photoRoomResponse.data);
+
+        // Dosyayı Supabase'e yükle
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("wardrobes")
+          .upload(`photoroom_${fileName}`, fs.createReadStream(filePath), {
+            contentType: "image/png",
+            cacheControl: "3600",
+          });
+
+        if (uploadError) {
+          throw new Error(`Supabase yükleme hatası: ${uploadError.message}`);
+        }
+
+        // Public URL al
+        const { data: publicUrlData } = await supabase.storage
+          .from("wardrobes")
+          .getPublicUrl(`photoroom_${fileName}`);
+
+        if (!publicUrlData || !publicUrlData.publicUrl) {
+          throw new Error("Public URL alınamadı");
+        }
+
+        // Geçici dosyayı temizle
+        fs.unlinkSync(filePath);
 
         // İşlenmiş görsel URL'sini kaydet
-        if (
-          predictionResult.status === "succeeded" &&
-          predictionResult.output
-        ) {
-          processedImages.push({
-            originalUrl: imageUrl,
-            processedUrl: predictionResult.output,
-            success: true,
-          });
-        } else {
-          failedImages.push({
-            originalUrl: imageUrl,
-            error: "İşlem tamamlanamadı veya çıktı alınamadı",
-          });
-        }
+        processedImages.push({
+          originalUrl: imageUrl,
+          processedUrl: publicUrlData.publicUrl,
+          success: true,
+        });
+
+        console.log(
+          `İşlenen resim Supabase'e yüklendi: ${publicUrlData.publicUrl}`
+        );
       } catch (error) {
         console.error(
           `Görsel işleme hatası (${imageUrl.substring(0, 30)}...):`,
