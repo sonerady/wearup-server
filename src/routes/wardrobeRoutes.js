@@ -783,6 +783,7 @@ router.post("/wardrobe", upload.single("image"), async (req, res) => {
       .insert({
         user_id: userId,
         item_name: itemName,
+        brand: req.body.brand || null, // Marka bilgisini ekle
         category: category,
         seasons: parsedSeasons,
         color: color,
@@ -902,6 +903,7 @@ router.put("/wardrobe/:id", upload.single("image"), async (req, res) => {
     // Öğeyi güncelle
     const updateData = {
       ...(itemName && { item_name: itemName }),
+      ...(req.body.brand !== undefined && { brand: req.body.brand }), // Marka bilgisini ekle
       ...(category && { category: category }),
       ...(seasons && { seasons: JSON.parse(seasons) }),
       ...(color && { color: color }),

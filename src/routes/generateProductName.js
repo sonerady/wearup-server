@@ -91,24 +91,26 @@ router.post(
          - "26": "Eşofman" (Sweatpants)
          - "27": "Tayt" (Leggings)
          
-      2. Distinctive features or a brief description of the item.
+      2. A VERY BRIEF description of the item (MAXIMUM 5 WORDS), focusing on color and type (e.g., "Beyaz Spor Ayakkabı", "Mavi Kot Pantolon", "Siyah Deri Ceket").
       3. The main color(s) of the item. Return ONLY standard CSS color names like "red", "blue", "green", "black", "white", "gray", "yellow", "orange", "purple", "pink", "brown", "navy", "teal", "olive", "maroon". If there are multiple colors, separate them with commas WITHOUT spaces (e.g., "red,blue,black").
       4. Suitable seasons for the item (Return as a list like ["İlkbahar", "Yaz"] or ["Tüm Mevsimler"]).
       5. Relevant tags (Return as a comma-separated string like "casual, cotton, comfortable").
       6. The material of the item (e.g., "Cotton", "Polyester", "Wool"). Always provide a best guess, do not state "Unknown".
       7. The style of the item (e.g., "Casual", "Formal", "Sporty", "Vintage"). Always provide a best guess, do not state "Unknown".
       8. The gender category the item belongs to. ONLY return one of these exact values: "men", "women", "unisex", "kids". Do not use any other values.
+      9. The brand of the item, if identifiable. If not clearly identifiable, make a best guess based on design, style, or common characteristics (e.g. "Nike", "Adidas", "Zara", "H&M"). If truly impossible to guess, return "Unknown".
 
       Respond STRICTLY in the following JSON format:
       {
         "type": "ONLY RETURN THE NUMERIC ID as a string, e.g. '1' or '12', etc.",
-        "query": "brief description of the item",
+        "query": "MAX 5 WORDS description",
         "color": "main color(s)",
         "seasons": ["season1", "season2"],
         "tags": "tag1, tag2, tag3",
         "material": "material",
         "style": "style",
-        "gender": "gender"
+        "gender": "gender",
+        "brand": "brand name"
       }
 
       Respond only with the JSON object, do not add any other explanation or markdown formatting like \`\`\`json.
@@ -159,6 +161,15 @@ router.post(
         // Eksik alanlar için varsayılan değerler ata
         analysisResult.type = analysisResult.type || "Giyim Ürünü";
         analysisResult.query = analysisResult.query || "Açıklama yok";
+
+        // Query en fazla 5 kelime olacak şekilde kırp
+        if (analysisResult.query) {
+          const words = analysisResult.query.split(" ");
+          if (words.length > 5) {
+            analysisResult.query = words.slice(0, 5).join(" ");
+          }
+        }
+
         analysisResult.color = analysisResult.color || "Belirlenmedi";
         analysisResult.seasons = Array.isArray(analysisResult.seasons)
           ? analysisResult.seasons
@@ -167,6 +178,7 @@ router.post(
         analysisResult.material = analysisResult.material || "Genel";
         analysisResult.style = analysisResult.style || "Genel";
         analysisResult.gender = analysisResult.gender || "Unisex";
+        analysisResult.brand = analysisResult.brand || "Unknown";
       } catch (error) {
         console.error("JSON ayrıştırma hatası veya eksik alanlar:", error);
         console.error("Alınan Ham Yanıt:", responseText);
@@ -180,6 +192,7 @@ router.post(
           material: "Genel",
           style: "Genel",
           gender: "Unisex",
+          brand: "Unknown",
         };
       }
 
@@ -239,6 +252,7 @@ router.post(
         material: analysisResult.material,
         style: analysisResult.style,
         gender: analysisResult.gender,
+        brand: analysisResult.brand, // Marka bilgisini ekle
       });
     } catch (error) {
       console.error("Ürün analizi hatası:", error); // Hata mesajı güncellendi

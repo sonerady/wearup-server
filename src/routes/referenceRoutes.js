@@ -109,6 +109,109 @@ async function normalizeImage(imageUrl) {
   }
 }
 
+// Görüntüye metin ekleme fonksiyonu
+async function addTextToImage(imageUrl, text) {
+  try {
+    console.log(`Görüntüye metin ekleniyor: ${text}`);
+
+    // URL'den görüntüyü indir
+    const buffer = await got(imageUrl).buffer();
+
+    // Görüntü bilgilerini al
+    const metadata = await sharp(buffer).metadata();
+    const { width, height } = metadata;
+
+    // Metin boyutunu belirle (görüntü genişliğinin %5'i)
+    const fontSize = Math.max(20, Math.round(width * 0.05));
+
+    // SVG tabanlı metin oluştur
+    // Not: Resmin alt kısmına tam genişlikte yerleştirme
+    const textOverlay = {
+      create: {
+        width: width,
+        height: height,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+    };
+
+    // Arka plan için tam siyah dikdörtgen oluştur
+    const svgPadding = fontSize * 0.5;
+    const svgX = 0; // Sol kenardan başla
+    const svgY = height - fontSize - svgPadding * 2; // Alttan başla
+    const textWidth = width; // Tam genişlik
+
+    const svgText = `
+      <svg width="${width}" height="${height}">
+        <rect
+          x="${svgX}"
+          y="${svgY}"
+          width="${textWidth}"
+          height="${fontSize + svgPadding * 2}"
+          fill="#000000"
+          rx="0"
+          ry="0"
+        />
+        <text
+          x="${width / 2}"
+          y="${svgY + fontSize + svgPadding * 0.5}"
+          font-family="Arial, Helvetica, sans-serif"
+          font-size="${fontSize}px"
+          font-weight="bold"
+          text-anchor="middle"
+          fill="white"
+        >${text}</text>
+      </svg>`;
+
+    // Metni görüntüye ekle
+    const outputBuffer = await sharp(buffer)
+      .composite([
+        {
+          input: Buffer.from(svgText),
+          gravity: "southeast",
+        },
+      ])
+      .toBuffer();
+
+    // İşlenmiş görüntüyü geçici dosyaya kaydet
+    const fileName = `text_added_${uuidv4()}.png`;
+    const filePath = path.join(tempDir, fileName);
+
+    await fs.promises.writeFile(filePath, outputBuffer);
+
+    // Supabase'e yükle
+    const remotePath = `processed/${fileName}`;
+    const { data, error } = await supabase.storage
+      .from("reference")
+      .upload(remotePath, outputBuffer, {
+        contentType: "image/png",
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("İşlenmiş görüntü yükleme hatası:", error);
+      throw error;
+    }
+
+    // Public URL al
+    const { data: publicUrlData } = supabase.storage
+      .from("reference")
+      .getPublicUrl(remotePath);
+
+    // Geçici dosyayı sil
+    fs.promises
+      .unlink(filePath)
+      .catch((err) => console.warn("Geçici dosya silinemedi:", err));
+
+    // Public URL'i döndür
+    return publicUrlData.publicUrl;
+  } catch (error) {
+    console.error("Görüntüye metin eklenirken hata:", error);
+    // Hata durumunda orijinal URL'i döndür
+    return imageUrl;
+  }
+}
+
 // Görsel oluşturma sonuçlarını veritabanına kaydetme fonksiyonu
 async function saveGenerationToDatabase(
   userId,
@@ -255,7 +358,7 @@ async function enhancePromptWithGemini(
 
     // Kullanıcının seçtiği ayarlardan bir metin oluşturalım
     const settingsText = Object.entries(settings)
-      .filter(([key, value]) => value) // Boş değerleri filtrele
+      .filter(([key, value]) => value !== null && value !== undefined) // Null veya undefined değerleri filtrele
       .map(([key, value]) => `${key}: ${value}`)
       .join(", ");
 
@@ -271,24 +374,78 @@ async function enhancePromptWithGemini(
     
     I need you to:
     1. Convert this prompt to English if it's not already in English
-    2. Enhance and rewrite it using proper prompt engineering techniques to be more effective for an AI image generator
+    2. Keep the prompt concise and to the point - maximum 2-3 sentences
     3. Keep any existing image references intact exactly as they appear in the original prompt
     4. If there are image names from the reference image tags list that are not already prefixed with @ in the prompt, add the @ symbol before them
-    5. Incorporate all the user settings to enhance the prompt. For example:
-       - If season is "Winter", add details about snow, cold weather, or winter clothing
-       - If location is "Beach", describe a beach setting with sand, ocean, and relevant elements
-       - If hairStyle or hairColor is selected, emphasize these features in the description
-       - If mood is specified, adjust the tone of the description accordingly
+    5. Only subtly incorporate the user settings without adding lengthy descriptions
+    6. CRITICAL - ACCESSORY DETECTION: When analyzing reference images for clothing/styling prompts, you MUST identify and include ALL accessories visible in the images, such as:
+       - Eyewear (glasses, sunglasses)
+       - Jewelry (necklaces, bracelets, rings, earrings)
+       - Scarves, shawls, ties
+       - Hats, caps, headbands
+       - Bags, purses, backpacks
+       - Watches, belts, gloves
+       - ANY other accessories visible in the images
     
-    IMPORTANT: The @ symbol indicates that the text following it is the actual name of a reference image. These names can be anything (not just "img_1", "img_2") and should be preserved exactly as they appear in the tags list.
+    IMPORTANT: 
+    - Your enhanced prompt should be SHORT (2-3 sentences maximum)
+    - Be professional in your wording
+    - The @ symbol indicates a reference image name
+    - DO NOT add unnecessary descriptive details about lighting, mood, or style unless explicitly mentioned in the original prompt
+    - DO ENUMERATE ALL visible clothing items AND accessories when the prompt is about dressing/wearing items - NEVER omit accessories
+    - Pay extra attention to small items like jewelry, glasses, and other accessories - these are often overlooked but must be included
     
-    Your output should only be the enhanced prompt in English, without any explanations or additional text. Maintain all image references from the original prompt with the @ prefix.
+    Note: I am providing the reference images with their tag names at the bottom. For "dressing" or "wearing" prompts, you MUST carefully examine each image and list ALL clothing items and accessories visible. Missing any accessory is considered a critical error.
+    
+    Your output should ONLY be the enhanced prompt in English, without any explanations. Keep it professional and make sure to mention EVERY accessory visible in the reference images when the user is asking to dress someone or wear items.
     `;
 
     console.log("Gemini'ye gönderilen istek:", promptForGemini);
 
-    // Gemini'den cevap al
-    const result = await model.generateContent(promptForGemini);
+    // Resim verilerini içerecek parts dizisini hazırla
+    const parts = [{ text: promptForGemini }];
+
+    // Referans resimleri varsa, bu resimleri Gemini'ye gönder
+    // Not: Burada maksimum 10 resim sınırlaması var, o yüzden ilk 10 resmi alıyoruz
+    const maxImagesToSend = Math.min(referenceImages.length, 10);
+
+    if (maxImagesToSend > 0) {
+      console.log(
+        `Gemini'ye ${maxImagesToSend} adet referans görsel gönderiliyor`
+      );
+
+      for (let i = 0; i < maxImagesToSend; i++) {
+        try {
+          const imageUrl = referenceImages[i].uri;
+          console.log(`Görsel yükleniyor: ${imageUrl}`);
+
+          // URL'den görüntüyü indir (Bu görüntüler zaten üzerinde metin eklenmiş haldedir)
+          const imageResponse = await got(imageUrl, { responseType: "buffer" });
+          const imageBuffer = imageResponse.body;
+
+          // Base64'e çevir
+          const base64Image = imageBuffer.toString("base64");
+
+          // Görsel verilerini parts dizisine ekle
+          parts.push({
+            inlineData: {
+              mimeType: "image/png",
+              data: base64Image,
+            },
+          });
+
+          console.log(`${i + 1}. görsel başarıyla yüklendi ve hazırlandı`);
+        } catch (imageError) {
+          console.error(`Görsel yüklenirken hata: ${imageError.message}`);
+        }
+      }
+    }
+
+    // Gemini'den cevap al - resimlerle birlikte
+    const result = await model.generateContent({
+      contents: [{ parts }],
+    });
+
     let enhancedPrompt = result.response.text().trim();
 
     console.log("Gemini'nin ilk ürettiği prompt:", enhancedPrompt);
@@ -350,15 +507,18 @@ router.post("/generate", async (req, res) => {
         // Görseli normalize et
         const normalizedUrl = await normalizeImage(img.uri);
 
-        // Normalize edilmiş görseli diziye ekle
+        // Normalize edilmiş görsele metin ekle (img.tag'i sağ alt köşeye yaz)
+        const processedUrl = await addTextToImage(normalizedUrl, img.tag);
+
+        // İşlenmiş görseli diziye ekle
         normalizedImages.push({
-          uri: normalizedUrl,
+          uri: processedUrl,
           tag: img.tag,
         });
 
-        console.log(`Görsel normalize edildi: ${img.tag}`);
+        console.log(`Görsel normalize edildi ve metin eklendi: ${img.tag}`);
       } catch (error) {
-        console.error(`Görsel normalize edilemedi: ${img.tag}`, error);
+        console.error(`Görsel işlenemedi: ${img.tag}`, error);
         // Hata durumunda orijinal görseli kullan
         normalizedImages.push(img);
       }
@@ -413,7 +573,7 @@ router.post("/generate", async (req, res) => {
 
     // İşlemin durumunu kontrol et (polling)
     let timeoutCount = 0;
-    const maxTimeouts = 60; // 60 saniye maksimum bekleme süresi
+    const maxTimeouts = 120; // 60 saniye maksimum bekleme süresi
 
     while (
       !["SUCCEEDED", "FAILED"].includes(task.status) &&
