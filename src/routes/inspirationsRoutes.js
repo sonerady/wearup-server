@@ -220,7 +220,7 @@ router.get("/inspirations/:id", async (req, res) => {
 // Yeni bir inspiration ekle
 router.post("/inspirations", upload.single("image"), async (req, res) => {
   try {
-    const { userId, title } = req.body;
+    const { userId, title, username } = req.body;
 
     if (!userId) {
       return res.status(400).json({
@@ -265,14 +265,22 @@ router.post("/inspirations", upload.single("image"), async (req, res) => {
 
     console.log("Veri eklemeden önce kullanıcı ID:", userId);
     console.log("Veri eklemeden önce URL:", urlData.publicUrl);
+    console.log("Kullanıcı adı:", username || "Belirtilmemiş");
 
     try {
       // Kullanıcı kontrolü
       const { data: userExists, error: userCheckError } = await supabase
         .from("users")
-        .select("id")
+        .select("id, username")
         .eq("id", userId)
         .single();
+
+      // Eğer kullanıcı adı request'ten gelmemişse, users tablosundan almayı dene
+      let userUsername = username;
+      if (!userUsername && userExists && userExists.username) {
+        userUsername = userExists.username;
+        console.log("Kullanıcı adı users tablosundan alındı:", userUsername);
+      }
 
       if (userCheckError) {
         console.log("Kullanıcı kontrol hatası:", userCheckError);
@@ -283,13 +291,14 @@ router.post("/inspirations", upload.single("image"), async (req, res) => {
         console.log("Kullanıcı bulundu:", userExists);
       }
 
-      // Veriyi ekle
+      // Veriyi ekle - username alanını da ekleyelim
       const { data, error } = await supabase
         .from("inspirations")
         .insert({
           user_id: userId,
           image_url: urlData.publicUrl,
           title: title || "Yeni İlham",
+          username: userUsername || null, // Kullanıcı adı ekle
         })
         .select()
         .single();
@@ -770,6 +779,16 @@ router.get("/user/:userId/inspirations", async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
+    // Önce kullanıcı bilgilerini al
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("username, name, avatar_url")
+      .eq("id", userId)
+      .single();
+
+    // Kullanıcı bilgilerini logla
+    console.log("Kullanıcı bilgileri:", userData);
+
     // Foreign key ilişkisi hatası nedeniyle basitleştirilmiş sorgu kullanıyoruz
     let query = supabase
       .from("inspirations")
@@ -785,6 +804,10 @@ router.get("/user/:userId/inspirations", async (req, res) => {
       throw error;
     }
 
+    // Kullanıcının gerçek adını kullan
+    const userRealUsername =
+      userData?.username || userData?.name || "Kullanıcı";
+
     // İşlenmiş veriyi oluştur
     const processedData = data.map((post) => ({
       ...post,
@@ -794,7 +817,8 @@ router.get("/user/:userId/inspirations", async (req, res) => {
       views: post.view_count || 0,
       user: {
         id: post.user_id,
-        username: "Kullanıcı", // Varsayılan değer
+        username: post.username || userRealUsername,
+        avatar_url: userData?.avatar_url || null,
       },
     }));
 

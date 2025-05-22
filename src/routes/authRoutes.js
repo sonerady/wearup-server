@@ -105,17 +105,23 @@ router.post("/login/google", async (req, res) => {
       });
     }
 
+    console.log("Alınan Google ID token:", idToken.substring(0, 30) + "...");
+
+    // Google ID token ile Supabase auth'a giriş yap
     const { data, error } = await supabase.auth.signInWithIdToken({
       provider: "google",
       token: idToken,
     });
 
     if (error) {
+      console.error("Supabase auth hatası:", error);
       return res.status(401).json({
         message: "Google ile giriş başarısız",
         error: error.message,
       });
     }
+
+    console.log("Supabase auth başarılı:", data.user.id);
 
     // Kullanıcı henüz users tablosunda yoksa ekle
     const userId = data.user.id;
@@ -125,34 +131,58 @@ router.post("/login/google", async (req, res) => {
       .eq("id", userId)
       .single();
 
-    if (checkError || !existingUser) {
-      const { data: newUser, error: insertError } = await supabase
+    if (checkError && checkError.code !== "PGRST116") {
+      console.error("Kullanıcı kontrolü hatası:", checkError);
+    }
+
+    // Kullanıcı yoksa yeni kullanıcı ekle
+    if (!existingUser) {
+      console.log("Yeni kullanıcı oluşturuluyor...");
+
+      const { data: userData, error: insertError } = await supabase
         .from("users")
         .insert([
           {
             id: userId,
             email: data.user.email,
             username:
-              data.user.user_metadata?.full_name ||
-              data.user.email.split("@")[0],
-            avatar_url: data.user.user_metadata?.avatar_url,
-            credit_balance: 0,
+              data.user.user_metadata?.name || data.user.email.split("@")[0],
+            avatar_url: data.user.user_metadata?.avatar_url || null,
+            is_pro: false,
+            auth_provider: "google",
           },
-        ]);
+        ])
+        .select();
 
       if (insertError) {
-        console.error("Kullanıcı kaydı oluşturulamadı:", insertError);
+        console.error("Kullanıcı oluşturma hatası:", insertError);
+        // Hata olsa bile işleme devam ediyoruz
+      } else {
+        console.log("Yeni kullanıcı oluşturuldu:", userData);
       }
+    } else {
+      console.log("Kullanıcı zaten var:", existingUser.id);
     }
 
+    // Kullanıcı bilgilerini döndür
     return res.status(200).json({
-      message: "Google ile giriş başarılı",
-      user: data.user,
-      session: data.session,
+      success: true,
+      user: {
+        id: userId,
+        email: data.user.email,
+        name: data.user.user_metadata?.name,
+        avatar_url: data.user.user_metadata?.avatar_url,
+      },
+      session: {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_at: data.session.expires_at,
+      },
     });
   } catch (error) {
+    console.error("Google auth genel hata:", error);
     return res.status(500).json({
-      message: "Sunucu hatası",
+      message: "Sunucu hatası oluştu",
       error: error.message,
     });
   }
@@ -291,6 +321,59 @@ router.post("/anonymous", async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Sunucu hatası",
+      error: error.message,
+    });
+  }
+});
+
+// Kullanıcı bilgilerini döndür (token ile)
+router.get("/me", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        message: "Yetkilendirme başlığı gereklidir",
+      });
+    }
+
+    // Bearer token'ı al
+    const token = authHeader.split(" ")[1];
+
+    // Supabase token ile kullanıcı bilgilerini kontrol et
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser(token);
+
+    if (error) {
+      console.error("Token doğrulama hatası:", error);
+      return res.status(401).json({
+        message: "Geçersiz veya süresi dolmuş token",
+        error: error.message,
+      });
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    // Kullanıcı bilgilerini döndür
+    return res.status(200).json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.name,
+        avatar_url: user.user_metadata?.avatar_url,
+      },
+    });
+  } catch (error) {
+    console.error("Kullanıcı bilgileri alma hatası:", error);
+    return res.status(500).json({
+      message: "Sunucu hatası oluştu",
       error: error.message,
     });
   }
