@@ -244,8 +244,8 @@ router.post("/analyze-clothing-url", async (req, res) => {
   console.log("Analyzing image from URL:", imageUrl);
 
   // Dinamik ülke ve dil parametreleri
-  const country = req.body.country || "tr";
-  const language = req.body.language || "tr";
+  const country = req.body.country || "us";
+  const language = req.body.language || "en";
   console.log(`Parametreler: Ülke: ${country}, Dil: ${language}`);
 
   // Create a temp filename for the downloaded image

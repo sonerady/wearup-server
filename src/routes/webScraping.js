@@ -29,7 +29,7 @@ async function convertWebPtoPNGorJPG(dataUri, format = "png") {
   }
 }
 
-async function searchProducts(query, country = "tr") {
+async function searchProducts(query, country, language) {
   const MAX_RETRIES = 3;
   const BASE_DELAY = 1000; // 1 saniye
   let retryCount = 0;
@@ -41,6 +41,7 @@ async function searchProducts(query, country = "tr") {
         api_key: API_KEY,
         query,
         country,
+        language: language,
         results: 40,
       };
 
@@ -143,13 +144,14 @@ async function searchProducts(query, country = "tr") {
 }
 
 // Yeni eklenen fonksiyon: Ürün detaylarını ve resim URL'lerini getirir
-async function getProductDetails(productId) {
+async function getProductDetails(productId, country, language) {
   try {
     const url = `https://api.scrapingdog.com/google_product`;
     const params = {
       api_key: API_KEY,
       product_id: productId,
-      country: "tr",
+      country: country,
+      language: language,
     };
 
     console.log("İstek yapılıyor:", url, params);
@@ -187,15 +189,13 @@ async function getProductDetails(productId) {
 }
 
 router.get("/search-product", async (req, res) => {
-  const { query, country } = req.query;
+  const { query, country, language } = req.query;
   if (!query)
     return res.status(400).json({ message: "Arama terimi gereklidir!" });
 
   try {
     console.log(
-      `Ürün araması API endpoint çağrıldı. Sorgu: "${query}", Ülke: "${
-        country || "tr"
-      }"`
+      `Ürün araması API endpoint çağrıldı. Sorgu: "${query}", Ülke: "${country}", Dil: "${language}"`
     );
 
     // Sorgu, özel karakterlere sahipse bunları temizle
@@ -208,19 +208,21 @@ router.get("/search-product", async (req, res) => {
       JSON.stringify({
         message: "Arama başlatıldı, sonuçlar işleniyor",
         query: cleanQuery,
-        country: country || "tr",
+        country: country,
+        language: language,
         status: "processing",
       })
     );
 
     // Ürün araması yap
-    const results = await searchProducts(cleanQuery, country || "tr");
+    const results = await searchProducts(cleanQuery, country, language);
 
     // Sonuçları istemciye gönder
     const responseData = {
       message: "Arama sonuçları başarıyla getirildi",
       query: cleanQuery,
-      country: country || "tr",
+      country: country,
+      language: language,
       count: results.length,
       results,
       status: "completed",
@@ -250,24 +252,23 @@ router.get("/search-product", async (req, res) => {
 });
 
 router.post("/search-product", async (req, res) => {
-  const { query, country } = req.body;
+  const { query, country, language } = req.body;
   if (!query)
     return res.status(400).json({ message: "Arama terimi gereklidir!" });
 
   try {
     console.log(
-      `Ürün araması API endpoint çağrıldı (POST). Sorgu: "${query}", Ülke: "${
-        country || "tr"
-      }"`
+      `Ürün araması API endpoint çağrıldı (POST). Sorgu: "${query}", Ülke: "${country}", Dil: "${language}"`
     );
 
     // Aramayı hemen başlat ve sonuçları normal şekilde dön
-    const results = await searchProducts(query, country || "tr");
+    const results = await searchProducts(query, country, language);
 
     res.status(200).json({
       message: "Arama sonuçları başarıyla getirildi",
       query,
-      country: country || "tr",
+      country: country,
+      language: language,
       count: results.length,
       results,
     });
@@ -283,13 +284,18 @@ router.post("/search-product", async (req, res) => {
 // Yeni endpoint: Ürün detaylarını getirme
 router.get("/product-details/:productId", async (req, res) => {
   const { productId } = req.params;
+  const { country, language } = req.query; // Query parametresinden country ve language al
 
   if (!productId) {
     return res.status(400).json({ message: "Ürün ID'si gereklidir!" });
   }
 
   try {
-    const productDetails = await getProductDetails(productId);
+    const productDetails = await getProductDetails(
+      productId,
+      country,
+      language
+    );
     res.status(200).json({
       message: "Ürün detayları başarıyla getirildi",
       productDetails,
@@ -304,7 +310,7 @@ router.get("/product-details/:productId", async (req, res) => {
 
 // URL'den doğrudan ürün detaylarını getirme endpointi
 router.post("/scrape-product-url", async (req, res) => {
-  const { scrapingdog_product_link } = req.body;
+  const { scrapingdog_product_link, country, language } = req.body; // country ve language parametrelerini de al
 
   if (!scrapingdog_product_link) {
     return res.status(400).json({ message: "Ürün URL'si gereklidir!" });
@@ -321,7 +327,11 @@ router.post("/scrape-product-url", async (req, res) => {
       });
     }
 
-    const productDetails = await getProductDetails(productId);
+    const productDetails = await getProductDetails(
+      productId,
+      country,
+      language
+    );
     res.status(200).json({
       message: "Ürün detayları başarıyla getirildi",
       productDetails,
