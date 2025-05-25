@@ -80,11 +80,15 @@ async function searchProducts(query) {
 
         results.push({
           name: item.title,
-          price: item.extracted_price,
-          originalPrice: item.old_price_extracted || null,
+          price: item.price,
+          originalPrice: item.old_price || null,
+          extracted_price: item.extracted_price,
+          old_price_extracted: item.old_price_extracted || null,
           merchant: item.source,
           image: thumb,
           url: item.product_link,
+          product_id: item.product_id,
+          scrapingdog_product_link: item.scrapingdog_product_link,
           rating: item.rating || null,
           reviewCount: item.reviews
             ? parseInt(item.reviews.replace(/[^\d]/g, ""), 10)
@@ -146,7 +150,7 @@ async function getProductDetails(productId) {
     const params = {
       api_key: API_KEY,
       product_id: productId,
-      country: "us",
+      country: "tr",
     };
 
     console.log("İstek yapılıyor:", url, params);
