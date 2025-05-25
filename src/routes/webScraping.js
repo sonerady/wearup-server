@@ -29,7 +29,7 @@ async function convertWebPtoPNGorJPG(dataUri, format = "png") {
   }
 }
 
-async function searchProducts(query) {
+async function searchProducts(query, country = "tr") {
   const MAX_RETRIES = 3;
   const BASE_DELAY = 1000; // 1 saniye
   let retryCount = 0;
@@ -40,9 +40,8 @@ async function searchProducts(query) {
       const params = {
         api_key: API_KEY,
         query,
-        country: "tr",
-        results: 10,
-        language: "tr",
+        country,
+        results: 40,
       };
 
       console.log(
@@ -188,12 +187,16 @@ async function getProductDetails(productId) {
 }
 
 router.get("/search-product", async (req, res) => {
-  const { query } = req.query;
+  const { query, country } = req.query;
   if (!query)
     return res.status(400).json({ message: "Arama terimi gereklidir!" });
 
   try {
-    console.log(`Ürün araması API endpoint çağrıldı. Sorgu: "${query}"`);
+    console.log(
+      `Ürün araması API endpoint çağrıldı. Sorgu: "${query}", Ülke: "${
+        country || "tr"
+      }"`
+    );
 
     // Sorgu, özel karakterlere sahipse bunları temizle
     const cleanQuery = query.trim().replace(/\s+/g, " ");
@@ -205,17 +208,19 @@ router.get("/search-product", async (req, res) => {
       JSON.stringify({
         message: "Arama başlatıldı, sonuçlar işleniyor",
         query: cleanQuery,
+        country: country || "tr",
         status: "processing",
       })
     );
 
     // Ürün araması yap
-    const results = await searchProducts(cleanQuery);
+    const results = await searchProducts(cleanQuery, country || "tr");
 
     // Sonuçları istemciye gönder
     const responseData = {
       message: "Arama sonuçları başarıyla getirildi",
       query: cleanQuery,
+      country: country || "tr",
       count: results.length,
       results,
       status: "completed",
@@ -245,19 +250,24 @@ router.get("/search-product", async (req, res) => {
 });
 
 router.post("/search-product", async (req, res) => {
-  const { query } = req.body;
+  const { query, country } = req.body;
   if (!query)
     return res.status(400).json({ message: "Arama terimi gereklidir!" });
 
   try {
-    console.log(`Ürün araması API endpoint çağrıldı (POST). Sorgu: "${query}"`);
+    console.log(
+      `Ürün araması API endpoint çağrıldı (POST). Sorgu: "${query}", Ülke: "${
+        country || "tr"
+      }"`
+    );
 
     // Aramayı hemen başlat ve sonuçları normal şekilde dön
-    const results = await searchProducts(query);
+    const results = await searchProducts(query, country || "tr");
 
     res.status(200).json({
       message: "Arama sonuçları başarıyla getirildi",
       query,
+      country: country || "tr",
       count: results.length,
       results,
     });

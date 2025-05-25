@@ -105,7 +105,9 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
           { "type": "Cap", "query": "red baseball cap male" }
         ]
 
-        Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" in English language including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
+        Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
+        
+        IMPORTANT: Write the "type" field in the user's language (${language}), but the "query" field must ALWAYS be in English.
       `;
 
       console.log("Sending request to Gemini API...");
@@ -241,9 +243,9 @@ router.post("/analyze-clothing-url", async (req, res) => {
   const imageUrl = req.body.imageUrl;
   console.log("Analyzing image from URL:", imageUrl);
 
-  // Force English language and US country to avoid Turkish prompt fragments
-  const country = "us";
-  const language = "en";
+  // Dinamik ülke ve dil parametreleri
+  const country = req.body.country || "tr";
+  const language = req.body.language || "tr";
   console.log(`Parametreler: Ülke: ${country}, Dil: ${language}`);
 
   // Create a temp filename for the downloaded image
@@ -310,7 +312,9 @@ router.post("/analyze-clothing-url", async (req, res) => {
         { "type": "Cap", "query": "red baseball cap male" }
       ]
 
-      Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" in English language including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
+      Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
+      
+      IMPORTANT: Write the "type" field in the user's language (${language}), but the "query" field must ALWAYS be in English.
     `;
 
     console.log("Sending request to Gemini API...");
