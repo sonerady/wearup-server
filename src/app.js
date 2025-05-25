@@ -13,7 +13,6 @@ const imageRoutes = require("./routes/imageRoutes");
 const backgroundGeneratorRouter = require("./routes/backgroundGenerator");
 const generateFirstShootRouter = require("./routes/generateFirstShoot");
 const generatePhotoshootRouter = require("./routes/generatePhotoshoot");
-const getModelRouter = require("./routes/getModel");
 const listTraingsRouter = require("./routes/listModels");
 const getTraining = require("./routes/getTraining");
 const updateCreditRouter = require("./routes/updateCredit");
@@ -51,6 +50,7 @@ const styleBattlesRoutes = require("./routes/styleBattles");
 const tournamentRoutes = require("./routes/tournamentRoutes");
 const generateProductNameRouter = require("./routes/generateProductName");
 const poseRoutes = require("./routes/poseRoutes");
+const referenceBrowserRoutes = require("./routes/referenceBrowserRoutes");
 // Lokasyon rotalarını import et
 const locationRoutes = require("./routes/locationRoutes");
 // Saç stili rotalarını import et
@@ -63,12 +63,15 @@ const referenceRoutes = require("./routes/referenceRoutes");
 // Yeni eklenen route import'ları
 const userProfileRoutes = require("./routes/userProfileRoutes");
 const authRoutes = require("./routes/authRoutes");
+const userPhotosRoutes = require("./routes/userPhotosRoutes");
 
 // RevenueCat webhook route import
 const revenuecatWebhookRouter = require("./routes/revenuecatWebhook");
 
 // Route modüllerini içe aktarma
 const exploreRoutes = require("./routes/exploreRoutes");
+
+const geminiTryOnProductCratorRoutes = require("./routes/geminiTryOnProductCratorRoutes");
 
 const app = express();
 
@@ -138,6 +141,7 @@ global.fetch = (url, opts = {}) => {
 // Yeni eklenen auth ve profile rotalarını önce tanımlayın
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userProfileRoutes);
+app.use("/api/photos", userPhotosRoutes);
 
 // outfitInteractionsRouter'ı outfitsRoutes'dan ÖNCE tanımlayın
 app.use("/api", outfitInteractionsRouter);
@@ -155,6 +159,7 @@ app.use("/api/hairstyles", hairStyleRoutes);
 app.use("/api/haircolors", hairColorRoutes);
 // Referans görsel oluşturma rotalarını ekle
 app.use("/api/reference", referenceRoutes);
+app.use("/api/referenceBrowser", referenceBrowserRoutes);
 app.use("/api/reference", exploreRoutes);
 
 // Mevcut route tanımlamaları
@@ -162,7 +167,6 @@ app.use("/api", backgroundGeneratorRouter);
 app.use("/api/images", imageRoutes);
 app.use("/api/generateFirstShoot", generateFirstShootRouter);
 app.use("/api/generatePhotoshoot", generatePhotoshootRouter);
-app.use("/api/getModel", getModelRouter);
 app.use("/api/listTrainings", listTraingsRouter);
 app.use("/api/getTraining", getTraining);
 app.use("/api/imageEnhancement", imageEnhancementRouter);
@@ -197,6 +201,7 @@ app.use("/api/style-battles", styleBattlesRoutes);
 app.use("/api/rankings", rankingsRoutes);
 app.use("/api/tournaments", tournamentRoutes);
 app.use("/api", generateProductNameRouter);
+app.use("/api/gemini-tryon", geminiTryOnProductCratorRoutes);
 
 // RevenueCat webhook route ekle
 app.use("/revenuecat", revenuecatWebhookRouter);
