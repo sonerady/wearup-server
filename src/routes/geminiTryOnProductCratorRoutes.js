@@ -58,8 +58,9 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
     "bytes"
   );
 
-  const country = "us";
-  const language = "en";
+  // Dinamik ülke ve dil parametreleri
+  const country = req.body.country || "us";
+  const language = req.body.language || "en";
   console.log(`Parametreler: Ülke: ${country}, Dil: ${language}`);
 
   const imagePath = req.file.path;
@@ -105,7 +106,9 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
           { "type": "Cap", "query": "red baseball cap male" }
         ]
 
-        Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" in English language including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
+        Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
+        
+        IMPORTANT: Write the "type" field in the user's language (${language}), but the "query" field must ALWAYS be in English.
       `;
 
       console.log("Sending request to Gemini API...");
@@ -241,9 +244,9 @@ router.post("/analyze-clothing-url", async (req, res) => {
   const imageUrl = req.body.imageUrl;
   console.log("Analyzing image from URL:", imageUrl);
 
-  // Force English language and US country to avoid Turkish prompt fragments
-  const country = "us";
-  const language = "en";
+  // Dinamik ülke ve dil parametreleri
+  const country = req.body.country || "us";
+  const language = req.body.language || "en";
   console.log(`Parametreler: Ülke: ${country}, Dil: ${language}`);
 
   // Create a temp filename for the downloaded image
@@ -310,7 +313,9 @@ router.post("/analyze-clothing-url", async (req, res) => {
         { "type": "Cap", "query": "red baseball cap male" }
       ]
 
-      Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" in English language including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
+      Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
+      
+      IMPORTANT: Write the "type" field in the user's language (${language}), but the "query" field must ALWAYS be in English.
     `;
 
     console.log("Sending request to Gemini API...");
@@ -440,6 +445,85 @@ router.post("/analyze-clothing-url", async (req, res) => {
   }
 });
 
+// Yeni endpoint: Ürün detaylarını çekme (InspirationDetailScreen.js mantığı ile)
+router.post("/scrape-product-url", async (req, res) => {
+  console.log("Product URL scraping API endpoint called");
+
+  if (!req.body || !req.body.scrapingdog_product_link) {
+    console.log("No scrapingdog_product_link found in request");
+    return res
+      .status(400)
+      .json({ error: "ScrapingDog product link is required" });
+  }
+
+  const { scrapingdog_product_link, country, language } = req.body;
+
+  // Dinamik ülke ve dil parametreleri
+  const userCountry = country || "us";
+  const userLanguage = language || "en";
+
+  console.log("Scraping product from URL:", scrapingdog_product_link);
+  console.log(
+    `User locale: Country: ${userCountry}, Language: ${userLanguage}`
+  );
+
+  try {
+    // ScrapingDog API isteği
+    const scrapingResponse = await axios.get(scrapingdog_product_link, {
+      timeout: 30000, // 30 saniye timeout
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": `${userLanguage}-${userCountry.toUpperCase()},${userLanguage};q=0.9,en;q=0.8`,
+        "Accept-Encoding": "gzip, deflate, br",
+        Connection: "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+      },
+    });
+
+    if (scrapingResponse.status === 200) {
+      console.log("✅ ScrapingDog API başarılı, ürün detayları alındı");
+
+      // HTML içeriğini parse etmek için basit regex kullanabiliriz
+      // Gerçek bir projede cheerio gibi bir HTML parser kullanmak daha iyi olur
+      const htmlContent = scrapingResponse.data;
+
+      // Basit ürün bilgisi çıkarma (bu kısım site yapısına göre özelleştirilebilir)
+      const productDetails = {
+        rawData: htmlContent,
+        success: true,
+        timestamp: new Date().toISOString(),
+        userLocale: {
+          country: userCountry,
+          language: userLanguage,
+        },
+      };
+
+      return res.status(200).json({
+        success: true,
+        message: "Product details scraped successfully",
+        productDetails: productDetails,
+        scrapingdog_product_link: scrapingdog_product_link,
+      });
+    } else {
+      throw new Error(
+        `ScrapingDog API returned status: ${scrapingResponse.status}`
+      );
+    }
+  } catch (error) {
+    console.error("❌ Product scraping error:", error.message);
+
+    return res.status(500).json({
+      success: false,
+      error: "Failed to scrape product details",
+      details: error.message,
+      scrapingdog_product_link: scrapingdog_product_link,
+    });
+  }
+});
+
 // Add a new route for generating product recommendations based on survey data
 router.post("/generate-products-from-survey", async (req, res) => {
   console.log("Product generation from survey data API endpoint called");
@@ -449,7 +533,13 @@ router.post("/generate-products-from-survey", async (req, res) => {
     return res.status(400).json({ error: "Request body is required" });
   }
 
-  const { selectedStyle, selectedCategories, customCategory } = req.body;
+  const {
+    selectedStyle,
+    selectedCategories,
+    customCategory,
+    country,
+    language,
+  } = req.body;
 
   if (
     !selectedStyle ||
@@ -462,10 +552,16 @@ router.post("/generate-products-from-survey", async (req, res) => {
     });
   }
 
+  // Dinamik ülke ve dil parametreleri
+  const userCountry = country || "us";
+  const userLanguage = language || "en";
+
   console.log("Survey data received:", {
     selectedStyle,
     selectedCategories,
     customCategory,
+    userCountry,
+    userLanguage,
   });
 
   try {
@@ -496,6 +592,8 @@ router.post("/generate-products-from-survey", async (req, res) => {
       
       User Style Preference: ${selectedStyle}
       Requested Product Categories: ${categoriesList.join(", ")}
+      User Location: ${userCountry.toUpperCase()}
+      User Language: ${userLanguage}
       
       For each requested category, generate specific product recommendations that perfectly match the ${selectedStyle} style.
       
@@ -522,12 +620,13 @@ router.post("/generate-products-from-survey", async (req, res) => {
       2. Each product MUST match the ${selectedStyle} style preference
       3. Include appropriate gender targeting (male, female, or unisex) in the query field
       4. Make query descriptions detailed with colors, materials, patterns, and style elements
-      5. Focus on realistic, commercially available products
+      5. Focus on realistic, commercially available products in ${userCountry.toUpperCase()}
       6. Ensure variety in product suggestions within each category
       7. Every item **must** have both "type" and "query" fields properly filled
       8. DO NOT use parentheses around the gender in the query field
       9. Return ONLY valid JSON array format
       10. Generate 1 product per requested category
+      11. Write the "type" field in the user's language (${userLanguage}), but the "query" field must ALWAYS be in English
     `;
 
     console.log("Sending request to Gemini API...");
@@ -620,6 +719,8 @@ router.post("/generate-products-from-survey", async (req, res) => {
         selectedCategories: categoriesList,
         customCategory,
       },
+      country: userCountry,
+      language: userLanguage,
     });
   } catch (error) {
     console.error("Error generating products:", error);
