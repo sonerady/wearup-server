@@ -64,6 +64,7 @@ const referenceRoutes = require("./routes/referenceRoutes");
 const userProfileRoutes = require("./routes/userProfileRoutes");
 const authRoutes = require("./routes/authRoutes");
 const userPhotosRoutes = require("./routes/userPhotosRoutes");
+const productUploadRoutes = require("./routes/productUploadRoutes");
 
 // RevenueCat webhook route import
 const revenuecatWebhookRouter = require("./routes/revenuecatWebhook");
@@ -142,6 +143,7 @@ global.fetch = (url, opts = {}) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userProfileRoutes);
 app.use("/api/photos", userPhotosRoutes);
+app.use("/api/products", productUploadRoutes);
 
 // outfitInteractionsRouter'ı outfitsRoutes'dan ÖNCE tanımlayın
 app.use("/api", outfitInteractionsRouter);
