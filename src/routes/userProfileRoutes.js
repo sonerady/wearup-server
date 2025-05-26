@@ -398,6 +398,157 @@ router.get("/check-username", async (req, res) => {
   }
 });
 
+// Onboarding verilerini kaydetme
+router.post("/profile/save-onboarding", async (req, res) => {
+  try {
+    const { userId, age, gender, style } = req.body;
+
+    console.log("Onboarding verileri alındı:", req.body);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID'si gereklidir",
+      });
+    }
+
+    // Veri validasyonu
+    const validAgeRanges = ["18-24", "25-34", "35-44", "45+"];
+    const validGenders = ["female", "male", "prefer_not_to_say"];
+
+    if (age && !validAgeRanges.includes(age)) {
+      return res.status(400).json({
+        success: false,
+        message: "Geçersiz yaş aralığı",
+      });
+    }
+
+    if (gender && !validGenders.includes(gender)) {
+      return res.status(400).json({
+        success: false,
+        message: "Geçersiz cinsiyet değeri",
+      });
+    }
+
+    if (style && (!Array.isArray(style) || style.length > 3)) {
+      return res.status(400).json({
+        success: false,
+        message: "Tarz seçimi en fazla 3 adet olmalıdır",
+      });
+    }
+
+    // Önce kullanıcının var olup olmadığını kontrol et
+    const { data: existingUser, error: checkError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
+
+    if (checkError || !existingUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    // Güncellenecek alanları hazırla
+    const updates = {
+      preferences_updated_at: new Date().toISOString(),
+    };
+
+    if (age) updates.age_range = age;
+    if (gender) updates.user_gender = gender;
+    if (style && style.length > 0)
+      updates.preferred_styles = JSON.stringify(style);
+
+    // Eğer tüm onboarding verileri varsa, onboarding'i tamamlandı olarak işaretle
+    if (age && gender && style && style.length > 0) {
+      updates.onboarding_completed = true;
+      updates.onboarding_completed_at = new Date().toISOString();
+    }
+
+    // Kullanıcı onboarding verilerini güncelle
+    const { data, error } = await supabase
+      .from("users")
+      .update(updates)
+      .eq("id", userId)
+      .select();
+
+    if (error) {
+      console.error("Onboarding verileri güncelleme hatası:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Onboarding verileri kaydedilemedi",
+        error: error.message,
+      });
+    }
+
+    console.log("Onboarding verileri başarıyla kaydedildi:", data[0]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Onboarding verileri başarıyla kaydedildi",
+      data: data[0],
+      onboarding_completed: updates.onboarding_completed || false,
+    });
+  } catch (error) {
+    console.error("Onboarding kaydetme hatası:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Sunucu hatası",
+      error: error.message,
+    });
+  }
+});
+
+// Onboarding durumunu kontrol etme
+router.get("/profile/onboarding-status/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID'si gereklidir",
+      });
+    }
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .select(
+        "age_range, user_gender, preferred_styles, onboarding_completed, onboarding_completed_at"
+      )
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+        error: error.message,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        age_range: user.age_range,
+        user_gender: user.user_gender,
+        preferred_styles: user.preferred_styles,
+        onboarding_completed: user.onboarding_completed || false,
+        onboarding_completed_at: user.onboarding_completed_at,
+      },
+    });
+  } catch (error) {
+    console.error("Onboarding durumu kontrol hatası:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Sunucu hatası",
+      error: error.message,
+    });
+  }
+});
+
 // Kullanıcı hesabını devre dışı bırakma
 router.delete("/profile/:userId", async (req, res) => {
   try {
