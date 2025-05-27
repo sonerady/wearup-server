@@ -599,4 +599,280 @@ router.delete("/profile/:userId", async (req, res) => {
   }
 });
 
+// Kullanıcının tercih ettiği kategorileri getirme
+router.get("/profile/categories/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID'si gereklidir",
+      });
+    }
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("preferred_categories")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("Kullanıcı kategorileri getirme hatası:", error);
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+        error: error.message,
+      });
+    }
+
+    // Kategorileri parse et, hata durumunda varsayılan kategorileri döndür
+    let categories;
+    try {
+      categories = user.preferred_categories
+        ? JSON.parse(user.preferred_categories)
+        : ["tshirt", "pants", "shoes", "bag", "jacket", "accessories"];
+    } catch (parseError) {
+      console.error("Kategori parse hatası:", parseError);
+      categories = ["tshirt", "pants", "shoes", "bag", "jacket", "accessories"];
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        preferred_categories: categories,
+      },
+    });
+  } catch (error) {
+    console.error("Kullanıcı kategorileri getirme genel hatası:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Sunucu hatası",
+      error: error.message,
+    });
+  }
+});
+
+// Kullanıcının tercih ettiği kategorileri güncelleme
+router.put("/profile/categories/update", async (req, res) => {
+  try {
+    const { userId, categories } = req.body;
+
+    console.log("Kategori güncelleme isteği:", req.body);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID'si gereklidir",
+      });
+    }
+
+    if (!categories || !Array.isArray(categories)) {
+      return res.status(400).json({
+        success: false,
+        message: "Geçerli bir kategori listesi gereklidir",
+      });
+    }
+
+    // Kategori sayısı kontrolü (maksimum 6)
+    if (categories.length > 6) {
+      return res.status(400).json({
+        success: false,
+        message: "En fazla 6 kategori seçebilirsiniz",
+      });
+    }
+
+    // En az 1 kategori kontrolü
+    if (categories.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "En az 1 kategori seçmelisiniz",
+      });
+    }
+
+    // Önce kullanıcının var olup olmadığını kontrol et
+    const { data: existingUser, error: checkError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
+
+    if (checkError || !existingUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    // Kategorileri JSON string olarak kaydet
+    const { data, error } = await supabase
+      .from("users")
+      .update({
+        preferred_categories: JSON.stringify(categories),
+        preferences_updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select();
+
+    if (error) {
+      console.error("Kategori güncelleme DB hatası:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Kategoriler güncellenemedi",
+        error: error.message,
+      });
+    }
+
+    console.log("Kategori güncelleme başarılı:", data);
+    return res.status(200).json({
+      success: true,
+      message: "Kategoriler başarıyla güncellendi",
+      data: {
+        preferred_categories: categories,
+      },
+    });
+  } catch (error) {
+    console.error("Kategori güncelleme hatası (catch):", error);
+    return res.status(500).json({
+      success: false,
+      message: "Sunucu hatası",
+      error: error.message,
+    });
+  }
+});
+
+// Kullanıcının aktif kategorilerini getirme
+router.get("/profile/active-categories/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID'si gereklidir",
+      });
+    }
+
+    const { data: user, error } = await supabase
+      .from("users")
+      .select("active_categories")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("Kullanıcı aktif kategorileri getirme hatası:", error);
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+        error: error.message,
+      });
+    }
+
+    // Aktif kategorileri parse et, hata durumunda varsayılan kategorileri döndür
+    let activeCategories;
+    try {
+      activeCategories = user.active_categories
+        ? JSON.parse(user.active_categories)
+        : ["tshirt"];
+    } catch (parseError) {
+      console.error("Aktif kategori parse hatası:", parseError);
+      activeCategories = ["tshirt"];
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        active_categories: activeCategories,
+      },
+    });
+  } catch (error) {
+    console.error("Kullanıcı aktif kategorileri getirme genel hatası:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Sunucu hatası",
+      error: error.message,
+    });
+  }
+});
+
+// Kullanıcının aktif kategorilerini güncelleme
+router.put("/profile/active-categories/update", async (req, res) => {
+  try {
+    const { userId, activeCategories } = req.body;
+
+    console.log("Aktif kategori güncelleme isteği:", req.body);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID'si gereklidir",
+      });
+    }
+
+    if (!activeCategories || !Array.isArray(activeCategories)) {
+      return res.status(400).json({
+        success: false,
+        message: "Geçerli bir aktif kategori listesi gereklidir",
+      });
+    }
+
+    // En az 1 kategori kontrolü
+    if (activeCategories.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "En az 1 aktif kategori seçmelisiniz",
+      });
+    }
+
+    // Önce kullanıcının var olup olmadığını kontrol et
+    const { data: existingUser, error: checkError } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
+
+    if (checkError || !existingUser) {
+      return res.status(404).json({
+        success: false,
+        message: "Kullanıcı bulunamadı",
+      });
+    }
+
+    // Aktif kategorileri JSON string olarak kaydet
+    const { data, error } = await supabase
+      .from("users")
+      .update({
+        active_categories: JSON.stringify(activeCategories),
+        preferences_updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select();
+
+    if (error) {
+      console.error("Aktif kategori güncelleme DB hatası:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Aktif kategoriler güncellenemedi",
+        error: error.message,
+      });
+    }
+
+    console.log("Aktif kategori güncelleme başarılı:", data);
+    return res.status(200).json({
+      success: true,
+      message: "Aktif kategoriler başarıyla güncellendi",
+      data: {
+        active_categories: activeCategories,
+      },
+    });
+  } catch (error) {
+    console.error("Aktif kategori güncelleme hatası (catch):", error);
+    return res.status(500).json({
+      success: false,
+      message: "Sunucu hatası",
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;
