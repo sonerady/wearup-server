@@ -32,11 +32,45 @@ router.get("/profile/:userId", async (req, res) => {
 // Profil düzenleme
 router.put("/profile/update", async (req, res) => {
   try {
-    const { userId, username, avatar_url, bio, website } = req.body;
+    const {
+      userId,
+      username,
+      avatar_url,
+      bio,
+      website,
+      gender,
+      age_range,
+      preferred_styles,
+    } = req.body;
 
     if (!userId) {
       return res.status(400).json({
         message: "Kullanıcı ID'si gereklidir",
+      });
+    }
+
+    // Veri validasyonu
+    const validAgeRanges = ["18-24", "25-34", "35-44", "45+"];
+    const validGenders = ["male", "female"];
+
+    if (age_range && !validAgeRanges.includes(age_range)) {
+      return res.status(400).json({
+        message: "Geçersiz yaş aralığı",
+      });
+    }
+
+    if (gender && !validGenders.includes(gender)) {
+      return res.status(400).json({
+        message: "Geçersiz cinsiyet değeri",
+      });
+    }
+
+    if (
+      preferred_styles &&
+      (!Array.isArray(preferred_styles) || preferred_styles.length > 3)
+    ) {
+      return res.status(400).json({
+        message: "Tercih edilen stiller en fazla 3 adet olmalıdır",
       });
     }
 
@@ -59,6 +93,19 @@ router.put("/profile/update", async (req, res) => {
     if (avatar_url !== undefined) updates.avatar_url = avatar_url;
     if (bio !== undefined) updates.bio = bio;
     if (website !== undefined) updates.website = website;
+    if (gender !== undefined) updates.user_gender = gender;
+    if (age_range !== undefined) updates.age_range = age_range;
+    if (preferred_styles !== undefined) {
+      // Eğer string olarak gelirse parse et, array ise JSON.stringify yap
+      if (typeof preferred_styles === "string") {
+        updates.preferred_styles = preferred_styles;
+      } else {
+        updates.preferred_styles = JSON.stringify(preferred_styles);
+      }
+    }
+
+    // Güncelleme zamanını ekle
+    updates.preferences_updated_at = new Date().toISOString();
 
     // Kullanıcı profil bilgilerini güncelle
     const { data, error } = await supabase
