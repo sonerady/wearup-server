@@ -130,7 +130,7 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
 
       // Extract the response text
       const responseText = result.response.text();
-      console.log("Gemini response received:", responseText);
+      console.log("Gemini response received:", responseText, language, country);
 
       // Parse the JSON response - handle different formats that might be returned
       let clothingItems = [];
