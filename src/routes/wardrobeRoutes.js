@@ -1894,64 +1894,23 @@ router.post("/wardrobe/outfit-items", async (req, res) => {
       throw checkError;
     }
 
-    // Eğer zaten eklenmiş ise, başarılı yanıt dön (idempotent)
+    // Eğer bu item daha önce eklenmişse, hata döndür
     if (existingItems && existingItems.length > 0) {
-      console.log(`Bu item zaten outfit'e eklenmiş: ${itemId}`);
-
-      // Belki pozisyon bilgileri güncellenmek isteniyordur, güncelle
-      if (
-        positionX !== undefined ||
-        positionY !== undefined ||
-        scale !== undefined ||
-        rotation !== undefined ||
-        zIndex !== undefined
-      ) {
-        console.log("Mevcut item için pozisyon bilgileri güncelleniyor");
-
-        const updateData = {};
-        if (positionX !== undefined) updateData.position_x = positionX;
-        if (positionY !== undefined) updateData.position_y = positionY;
-        if (scale !== undefined) updateData.scale = scale;
-        if (rotation !== undefined) updateData.rotation = rotation;
-        if (zIndex !== undefined) updateData.z_index = zIndex;
-
-        // Boş update data kontrolü
-        if (Object.keys(updateData).length === 0) {
-          return res.status(200).json({
-            success: true,
-            message: "Bu item zaten outfit'e eklenmiş",
-            data: existingItems[0],
-          });
-        }
-
-        // Pozisyon bilgilerini güncelle
-        const { data: updatedItem, error: updateError } = await supabase
-          .from("wardrobe_outfit_items")
-          .update(updateData)
-          .eq("outfit_id", outfitId)
-          .eq("item_id", itemId)
-          .select();
-
-        if (updateError) {
-          console.error("Pozisyon güncelleme hatası:", updateError);
-          throw updateError;
-        }
-
-        return res.status(200).json({
-          success: true,
-          message: "Item pozisyonu güncellendi",
-          data: updatedItem[0],
-        });
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: "Bu item zaten outfit'e eklenmiş",
-        data: existingItems[0],
+      console.log(
+        `Item zaten mevcut: outfit_id=${outfitId}, item_id=${itemId}`
+      );
+      return res.status(400).json({
+        success: false,
+        message: "Bu öğe zaten kombinde mevcut",
+        data: {
+          outfitId,
+          itemId,
+          existingRecord: existingItems[0],
+        },
       });
     }
 
-    // Yeni bir wardrobe_outfit_items kaydı oluştur
+    // Yeni outfit_item kaydı oluştur
     const insertData = {
       outfit_id: outfitId,
       item_id: itemId,
@@ -1996,6 +1955,100 @@ router.post("/wardrobe/outfit-items", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Item outfit'e eklenirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
+// Outfit arkaplan ayarlarını güncelleme endpoint'i
+router.put("/wardrobe/outfits/:id/background", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { backgroundColor, backgroundImageUrl, backgroundOpacity } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Outfit ID gerekli",
+      });
+    }
+
+    console.log(`Outfit ID: ${id} için arkaplan ayarları güncelleniyor`);
+    console.log("Gelen veriler:", {
+      backgroundColor,
+      backgroundImageUrl,
+      backgroundOpacity,
+    });
+
+    // UUID formatı kontrolü
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      console.log("Geçersiz UUID formatı!");
+      return res.status(400).json({
+        success: false,
+        message: "Geçersiz Outfit ID formatı",
+      });
+    }
+
+    // Güncellenecek veriler için obje oluştur
+    const updateData = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // Sadece gönderilen alanları güncelle
+    if (backgroundColor !== undefined) {
+      updateData.background_color = backgroundColor;
+    }
+    if (backgroundImageUrl !== undefined) {
+      updateData.background_image_url = backgroundImageUrl;
+    }
+    if (backgroundOpacity !== undefined) {
+      // Opacity 0.0-1.0 arasında olmalı
+      const validOpacity = Math.max(
+        0.0,
+        Math.min(1.0, parseFloat(backgroundOpacity))
+      );
+      updateData.background_opacity = validOpacity;
+    }
+
+    console.log("Güncelleme verileri:", updateData);
+
+    // Outfit'i güncelle
+    const { data, error } = await supabase
+      .from("wardrobe_outfits")
+      .update(updateData)
+      .eq("id", id)
+      .select("id, background_color, background_image_url, background_opacity");
+
+    if (error) {
+      console.error("Arkaplan ayarları güncellenirken hata:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Arkaplan ayarları güncellenirken bir hata oluştu",
+        error: error.message,
+      });
+    }
+
+    if (!data || data.length === 0) {
+      console.log(`Outfit bulunamadı. ID: ${id}`);
+      return res.status(404).json({
+        success: false,
+        message: "Belirtilen ID'ye sahip outfit bulunamadı",
+      });
+    }
+
+    console.log(`Outfit arkaplan ayarları başarıyla güncellendi. ID: ${id}`);
+    return res.status(200).json({
+      success: true,
+      message: "Arkaplan ayarları başarıyla güncellendi",
+      data: data[0],
+    });
+  } catch (error) {
+    console.error("Arkaplan ayarları güncelleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Arkaplan ayarları güncellenirken bir hata oluştu",
       error: error.message,
     });
   }

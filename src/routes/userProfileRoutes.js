@@ -673,15 +673,24 @@ router.get("/profile/categories/:userId", async (req, res) => {
       });
     }
 
-    // Kategorileri parse et, hata durumunda varsayılan kategorileri döndür
-    let categories;
-    try {
-      categories = user.preferred_categories
-        ? JSON.parse(user.preferred_categories)
-        : ["tshirt", "pants", "shoes", "bag", "jacket", "accessories"];
-    } catch (parseError) {
-      console.error("Kategori parse hatası:", parseError);
-      categories = ["tshirt", "pants", "shoes", "bag", "jacket", "accessories"];
+    // JSONB kolonu direkt JS array/object olarak gelir, parse'a gerek yok
+    let categories = user.preferred_categories || [
+      "t-shirt",
+      "pants",
+      "shoes",
+      "jacket",
+      "skirt",
+      "bag",
+    ];
+
+    // Eğer string gelirse (eski format), parse et
+    if (typeof categories === "string") {
+      try {
+        categories = JSON.parse(categories);
+      } catch (parseError) {
+        console.error("Kategori parse hatası:", parseError);
+        categories = ["t-shirt", "pants", "shoes", "jacket", "skirt", "bag"];
+      }
     }
 
     return res.status(200).json({
@@ -755,7 +764,7 @@ router.put("/profile/categories/update", async (req, res) => {
     const { data, error } = await supabase
       .from("users")
       .update({
-        preferred_categories: JSON.stringify(categories),
+        preferred_categories: categories, // JSONB kolonu için direkt array gönder
         preferences_updated_at: new Date().toISOString(),
       })
       .eq("id", userId)
@@ -815,15 +824,17 @@ router.get("/profile/active-categories/:userId", async (req, res) => {
       });
     }
 
-    // Aktif kategorileri parse et, hata durumunda varsayılan kategorileri döndür
-    let activeCategories;
-    try {
-      activeCategories = user.active_categories
-        ? JSON.parse(user.active_categories)
-        : ["tshirt"];
-    } catch (parseError) {
-      console.error("Aktif kategori parse hatası:", parseError);
-      activeCategories = ["tshirt"];
+    // JSONB kolonu direkt JS array/object olarak gelir, parse'a gerek yok
+    let activeCategories = user.active_categories || ["t-shirt", "pants"];
+
+    // Eğer string gelirse (eski format), parse et
+    if (typeof activeCategories === "string") {
+      try {
+        activeCategories = JSON.parse(activeCategories);
+      } catch (parseError) {
+        console.error("Aktif kategori parse hatası:", parseError);
+        activeCategories = ["t-shirt", "pants"];
+      }
     }
 
     return res.status(200).json({
@@ -889,7 +900,7 @@ router.put("/profile/active-categories/update", async (req, res) => {
     const { data, error } = await supabase
       .from("users")
       .update({
-        active_categories: JSON.stringify(activeCategories),
+        active_categories: activeCategories, // JSONB kolonu için direkt array gönder
         preferences_updated_at: new Date().toISOString(),
       })
       .eq("id", userId)
