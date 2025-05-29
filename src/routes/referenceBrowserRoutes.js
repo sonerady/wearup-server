@@ -1,6 +1,5 @@
 const express = require("express");
 const router = express.Router();
-const RunwayML = require("@runwayml/sdk");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { createClient } = require("@supabase/supabase-js");
 const got = require("got");
@@ -22,71 +21,103 @@ if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
 }
 
-// Görüntü normalleştirme fonksiyonu
-async function normalizeImage(imageUrl) {
+// Üç görseli yan yana birleştiren fonksiyon
+async function combineImagesHorizontally(image1Url, image2Url, image3Url) {
   try {
-    console.log(`Görüntü normalize ediliyor: ${imageUrl}`);
-
-    // URL'den görüntüyü indir
-    const buffer = await got(imageUrl).buffer();
-
-    // Görüntü bilgilerini al
-    const metadata = await sharp(buffer).metadata();
-    const { width, height } = metadata;
-    const ratio = width / height;
-
     console.log(
-      `Orijinal görüntü boyutu: ${width}x${height}, oran: ${ratio.toFixed(3)}`
+      `3 görsel yan yana birleştiriliyor: ${image1Url} + ${image2Url} + ${image3Url}`
     );
 
-    // Oranı kontrol et ve gerekirse düzelt
-    let outputBuffer;
+    // Üç görüntüyü de indir
+    const [buffer1, buffer2, buffer3] = await Promise.all([
+      got(image1Url).buffer(),
+      got(image2Url).buffer(),
+      got(image3Url).buffer(),
+    ]);
 
-    if (ratio < 0.5) {
-      // Çok dar görüntü (width çok küçük) - genişliği arttır
-      const targetWidth = Math.ceil(height * 0.5);
-      console.log(`Görüntü çok dar. Yeni boyut: ${targetWidth}x${height}`);
+    // Görüntü bilgilerini al
+    const [metadata1, metadata2, metadata3] = await Promise.all([
+      sharp(buffer1).metadata(),
+      sharp(buffer2).metadata(),
+      sharp(buffer3).metadata(),
+    ]);
 
-      outputBuffer = await sharp(buffer)
-        .resize(targetWidth, height, {
-          fit: "contain",
-          background: { r: 255, g: 255, b: 255, alpha: 1 },
-        })
-        .toBuffer();
-    } else if (ratio > 2.0) {
-      // Çok geniş görüntü (height çok küçük) - yüksekliği arttır
-      const targetHeight = Math.ceil(width / 2);
-      console.log(`Görüntü çok geniş. Yeni boyut: ${width}x${targetHeight}`);
+    // Hedef boyutları hesapla - eşit yükseklik, yan yana
+    const targetHeight = Math.max(
+      metadata1.height,
+      metadata2.height,
+      metadata3.height
+    );
+    const aspect1 = metadata1.width / metadata1.height;
+    const aspect2 = metadata2.width / metadata2.height;
+    const aspect3 = metadata3.width / metadata3.height;
 
-      outputBuffer = await sharp(buffer)
-        .resize(width, targetHeight, {
-          fit: "contain",
-          background: { r: 255, g: 255, b: 255, alpha: 1 },
-        })
-        .toBuffer();
-    } else {
-      // Oran zaten geçerli
-      console.log("Görüntü oranı zaten geçerli, değişiklik yapılmadı.");
-      outputBuffer = buffer;
-    }
+    const width1 = Math.round(targetHeight * aspect1);
+    const width2 = Math.round(targetHeight * aspect2);
+    const width3 = Math.round(targetHeight * aspect3);
+    const totalWidth = width1 + width2 + width3;
 
-    // Normalize edilmiş görüntüyü geçici dosyaya kaydet
-    const fileName = `normalized_${uuidv4()}.png`;
+    console.log(`Birleştirilmiş görüntü boyutu: ${totalWidth}x${targetHeight}`);
+    console.log(`Görsel genişlikleri: ${width1}, ${width2}, ${width3}`);
+
+    // Birinci görüntüyü yeniden boyutlandır (face)
+    const resizedBuffer1 = await sharp(buffer1)
+      .resize(width1, targetHeight, {
+        fit: "cover",
+        position: "center",
+      })
+      .toBuffer();
+
+    // İkinci görüntüyü yeniden boyutlandır (model)
+    const resizedBuffer2 = await sharp(buffer2)
+      .resize(width2, targetHeight, {
+        fit: "cover",
+        position: "center",
+      })
+      .toBuffer();
+
+    // Üçüncü görüntüyü yeniden boyutlandır (product)
+    const resizedBuffer3 = await sharp(buffer3)
+      .resize(width3, targetHeight, {
+        fit: "cover",
+        position: "center",
+      })
+      .toBuffer();
+
+    // Görüntüleri yan yana birleştir
+    const combinedBuffer = await sharp({
+      create: {
+        width: totalWidth,
+        height: targetHeight,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    })
+      .composite([
+        { input: resizedBuffer1, left: 0, top: 0 },
+        { input: resizedBuffer2, left: width1, top: 0 },
+        { input: resizedBuffer3, left: width1 + width2, top: 0 },
+      ])
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    // Birleştirilmiş görüntüyü geçici dosyaya kaydet
+    const fileName = `combined_3images_${uuidv4()}.jpg`;
     const filePath = path.join(tempDir, fileName);
 
-    await fs.promises.writeFile(filePath, outputBuffer);
+    await fs.promises.writeFile(filePath, combinedBuffer);
 
     // Supabase'e yükle
-    const remotePath = `normalized/${fileName}`;
+    const remotePath = `combined/${fileName}`;
     const { data, error } = await supabase.storage
       .from("reference")
-      .upload(remotePath, outputBuffer, {
-        contentType: "image/png",
+      .upload(remotePath, combinedBuffer, {
+        contentType: "image/jpeg",
         upsert: true,
       });
 
     if (error) {
-      console.error("Normalize edilmiş görüntü yükleme hatası:", error);
+      console.error("Birleştirilmiş görüntü yükleme hatası:", error);
       throw error;
     }
 
@@ -100,96 +131,96 @@ async function normalizeImage(imageUrl) {
       .unlink(filePath)
       .catch((err) => console.warn("Geçici dosya silinemedi:", err));
 
-    // Public URL'i döndür
+    console.log("3 görüntü başarıyla birleştirildi:", publicUrlData.publicUrl);
     return publicUrlData.publicUrl;
   } catch (error) {
-    console.error("Görüntü normalize edilirken hata:", error);
-    // Hata durumunda orijinal URL'i döndür
-    return imageUrl;
+    console.error("Görüntüler birleştirilirken hata:", error);
+    throw error;
   }
 }
 
-// Görüntüye metin ekleme fonksiyonu
-async function addTextToImage(imageUrl, text) {
+// İki görseli (model + product) yan yana birleştiren fonksiyon
+async function combineModelAndProduct(modelImageUrl, productImageUrl) {
   try {
-    console.log(`Görüntüye metin ekleniyor: ${text}`);
+    console.log(
+      `Model ve product görseli birleştiriliyor: ${modelImageUrl} + ${productImageUrl}`
+    );
 
-    // URL'den görüntüyü indir
-    const buffer = await got(imageUrl).buffer();
+    // İki görüntüyü de indir
+    const [modelBuffer, productBuffer] = await Promise.all([
+      got(modelImageUrl).buffer(),
+      got(productImageUrl).buffer(),
+    ]);
 
     // Görüntü bilgilerini al
-    const metadata = await sharp(buffer).metadata();
-    const { width, height } = metadata;
+    const [modelMetadata, productMetadata] = await Promise.all([
+      sharp(modelBuffer).metadata(),
+      sharp(productBuffer).metadata(),
+    ]);
 
-    // Metin boyutunu belirle (görüntü genişliğinin %5'i)
-    const fontSize = Math.max(20, Math.round(width * 0.05));
+    // Hedef boyutları hesapla - eşit yükseklik, yan yana
+    const targetHeight = Math.max(modelMetadata.height, productMetadata.height);
+    const modelAspect = modelMetadata.width / modelMetadata.height;
+    const productAspect = productMetadata.width / productMetadata.height;
 
-    // SVG tabanlı metin oluştur
-    // Not: Resmin alt kısmına tam genişlikte yerleştirme
-    const textOverlay = {
-      create: {
-        width: width,
-        height: height,
-        channels: 4,
-        background: { r: 0, g: 0, b: 0, alpha: 0 },
-      },
-    };
+    const modelWidth = Math.round(targetHeight * modelAspect);
+    const productWidth = Math.round(targetHeight * productAspect);
+    const totalWidth = modelWidth + productWidth;
 
-    // Arka plan için tam siyah dikdörtgen oluştur
-    const svgPadding = fontSize * 0.5;
-    const svgX = 0; // Sol kenardan başla
-    const svgY = height - fontSize - svgPadding * 2; // Alttan başla
-    const textWidth = width; // Tam genişlik
+    console.log(`Birleştirilmiş görüntü boyutu: ${totalWidth}x${targetHeight}`);
+    console.log(
+      `Görsel genişlikleri: model=${modelWidth}, product=${productWidth}`
+    );
 
-    const svgText = `
-      <svg width="${width}" height="${height}">
-        <rect
-          x="${svgX}"
-          y="${svgY}"
-          width="${textWidth}"
-          height="${fontSize + svgPadding * 2}"
-          fill="#000000"
-          rx="0"
-          ry="0"
-        />
-        <text
-          x="${width / 2}"
-          y="${svgY + fontSize + svgPadding * 0.5}"
-          font-family="Arial, Helvetica, sans-serif"
-          font-size="${fontSize}px"
-          font-weight="bold"
-          text-anchor="middle"
-          fill="white"
-        >${text}</text>
-      </svg>`;
-
-    // Metni görüntüye ekle
-    const outputBuffer = await sharp(buffer)
-      .composite([
-        {
-          input: Buffer.from(svgText),
-          gravity: "southeast",
-        },
-      ])
+    // Model görüntüsünü yeniden boyutlandır
+    const resizedModelBuffer = await sharp(modelBuffer)
+      .resize(modelWidth, targetHeight, {
+        fit: "cover",
+        position: "center",
+      })
       .toBuffer();
 
-    // İşlenmiş görüntüyü geçici dosyaya kaydet
-    const fileName = `text_added_${uuidv4()}.png`;
+    // Product görüntüsünü yeniden boyutlandır
+    const resizedProductBuffer = await sharp(productBuffer)
+      .resize(productWidth, targetHeight, {
+        fit: "cover",
+        position: "center",
+      })
+      .toBuffer();
+
+    // Görüntüleri yan yana birleştir
+    const combinedBuffer = await sharp({
+      create: {
+        width: totalWidth,
+        height: targetHeight,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    })
+      .composite([
+        { input: resizedModelBuffer, left: 0, top: 0 },
+        { input: resizedProductBuffer, left: modelWidth, top: 0 },
+      ])
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    // Birleştirilmiş görüntüyü geçici dosyaya kaydet
+    const fileName = `combined_model_product_${uuidv4()}.jpg`;
     const filePath = path.join(tempDir, fileName);
 
-    await fs.promises.writeFile(filePath, outputBuffer);
+    await fs.promises.writeFile(filePath, combinedBuffer);
 
     // Supabase'e yükle
-    const remotePath = `processed/${fileName}`;
+    const remotePath = `combined/${fileName}`;
     const { data, error } = await supabase.storage
       .from("reference")
-      .upload(remotePath, outputBuffer, {
-        contentType: "image/png",
+      .upload(remotePath, combinedBuffer, {
+        contentType: "image/jpeg",
         upsert: true,
       });
 
     if (error) {
-      console.error("İşlenmiş görüntü yükleme hatası:", error);
+      console.error("Model+Product görüntü yükleme hatası:", error);
       throw error;
     }
 
@@ -203,12 +234,14 @@ async function addTextToImage(imageUrl, text) {
       .unlink(filePath)
       .catch((err) => console.warn("Geçici dosya silinemedi:", err));
 
-    // Public URL'i döndür
+    console.log(
+      "Model + Product görüntüleri başarıyla birleştirildi:",
+      publicUrlData.publicUrl
+    );
     return publicUrlData.publicUrl;
   } catch (error) {
-    console.error("Görüntüye metin eklenirken hata:", error);
-    // Hata durumunda orijinal URL'i döndür
-    return imageUrl;
+    console.error("Model + Product birleştirme hatası:", error);
+    throw error;
   }
 }
 
@@ -252,72 +285,40 @@ async function saveGenerationToDatabase(
 // Gemini API için istemci oluştur
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Ratio formatını düzelten yardımcı fonksiyon
-function formatRatio(ratioStr) {
-  // RunwayML tarafından resmi olarak desteklenen piksel formatları
-  const validPixelValues = [
-    "1920:1080",
-    "1080:1920",
-    "1024:1024",
-    "1360:768",
-    "1080:1080",
-    "1168:880",
-    "1440:1080",
-    "1080:1440",
-    "1808:768",
-    "2112:912",
-  ];
-
-  // Kullanıcı arayüzündeki oranların piksel karşılıkları
-  const validPixelRatios = {
-    "1:1": "1024:1024", // veya "1080:1080"
-    "4:3": "1440:1080",
-    "3:4": "1080:1440",
-    "16:9": "1920:1080",
-    "9:16": "1080:1920",
-    "21:9": "2112:912", // buna en yakın değer
-  };
+// Aspect ratio formatını düzelten yardımcı fonksiyon
+function formatAspectRatio(ratioStr) {
+  const validRatios = ["1:1", "4:3", "3:4", "16:9", "9:16", "21:9"];
 
   try {
-    // Ratio string'inin geçerli olup olmadığını kontrol et
     if (!ratioStr || !ratioStr.includes(":")) {
       console.log(
-        `Geçersiz ratio formatı: ${ratioStr}, varsayılan değer kullanılıyor: 1080:1920`
+        `Geçersiz ratio formatı: ${ratioStr}, varsayılan değer kullanılıyor: 9:16`
       );
-      return "1080:1920";
+      return "9:16";
     }
 
-    // Eğer gelen değer piksel cinsinden ve doğrudan desteklenen bir formatsa kullan
-    if (validPixelValues.includes(ratioStr)) {
-      console.log(`Gelen ratio değeri geçerli piksel formatında: ${ratioStr}`);
+    // Eğer gelen değer geçerli bir ratio ise kullan
+    if (validRatios.includes(ratioStr)) {
+      console.log(`Gelen ratio değeri geçerli: ${ratioStr}`);
       return ratioStr;
     }
 
-    // Eğer gelen değer oran cinsinden ve doğrudan karşılığı varsa dönüştür
-    if (validPixelRatios[ratioStr]) {
-      console.log(
-        `Ratio ${ratioStr} dönüştürüldü: ${validPixelRatios[ratioStr]}`
-      );
-      return validPixelRatios[ratioStr];
-    }
-
-    // Piksel değerlerini kontrol et - client'dan dönüştürülmüş olabilir
+    // Piksel değerlerini orana çevir
     const [width, height] = ratioStr.split(":").map(Number);
 
-    // Geçerli piksel değerleri mi kontrol et
     if (!width || !height || isNaN(width) || isNaN(height)) {
       console.log(
-        `Geçersiz ratio değerleri: ${ratioStr}, varsayılan değer kullanılıyor: 1080:1920`
+        `Geçersiz ratio değerleri: ${ratioStr}, varsayılan değer kullanılıyor: 9:16`
       );
-      return "1080:1920";
+      return "9:16";
     }
 
-    // Eğer özel bir oran ise, en yakın desteklenen oranı bul
+    // En yakın standart oranı bul
     const aspectRatio = width / height;
-    let closestRatio = "1080:1920"; // Varsayılan
+    let closestRatio = "9:16";
     let minDifference = Number.MAX_VALUE;
 
-    for (const validRatio of validPixelValues) {
+    for (const validRatio of validRatios) {
       const [validWidth, validHeight] = validRatio.split(":").map(Number);
       const validAspectRatio = validWidth / validHeight;
       const difference = Math.abs(aspectRatio - validAspectRatio);
@@ -329,7 +330,7 @@ function formatRatio(ratioStr) {
     }
 
     console.log(
-      `Özel ratio ${ratioStr} için en yakın desteklenen değer: ${closestRatio}`
+      `Ratio ${ratioStr} için en yakın desteklenen değer: ${closestRatio}`
     );
     return closestRatio;
   } catch (error) {
@@ -337,21 +338,18 @@ function formatRatio(ratioStr) {
       `Ratio formatı işlenirken hata oluştu: ${error.message}`,
       error
     );
-    return "1080:1920"; // Varsayılan değer
+    return "9:16";
   }
 }
 
 // Prompt'u iyileştirmek için Gemini'yi kullan
 async function enhancePromptWithGemini(
   originalPrompt,
-  referenceImages,
+  combinedImageUrl,
   settings = {}
 ) {
   try {
     console.log("Gemini ile prompt iyileştirme başlatılıyor");
-
-    // Referans görsellerden tag listesi oluştur
-    const imageTags = referenceImages.map((img) => img.tag).filter(Boolean);
 
     // Gemini modeli
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
@@ -368,7 +366,6 @@ async function enhancePromptWithGemini(
     let settingsPromptSection = "";
 
     if (hasValidSettings) {
-      // Kullanıcının seçtiği ayarlardan bir metin oluşturalım
       const settingsText = Object.entries(settings)
         .filter(
           ([key, value]) =>
@@ -379,7 +376,6 @@ async function enhancePromptWithGemini(
 
       console.log("🎛️ [BACKEND GEMINI] Settings için prompt oluşturuluyor...");
       console.log("📝 [BACKEND GEMINI] Settings text:", settingsText);
-      console.log("🔍 [BACKEND GEMINI] Settings object detayı:", settings);
 
       settingsPromptSection = `
     User selected settings: ${settingsText}
@@ -395,74 +391,92 @@ async function enhancePromptWithGemini(
       )
       .join("\n    ")}
     
-    IMPORTANT: Please incorporate the user settings above into your description when appropriate. For example:
-    - If location is specified, mention the setting/environment
-    - If season is specified, consider seasonal appropriateness  
-    - If hair style/color is specified, describe accordingly
-    - If mood/pose is specified, incorporate into the description
-    - If perspective is specified, use appropriate viewpoint`;
-    } else {
-      console.log(
-        "🎛️ [BACKEND GEMINI] Settings boş veya geçersiz, settings promptu eklenmeyecek"
-      );
+    IMPORTANT: Please incorporate the user settings above into your description when appropriate.`;
     }
 
     // Gemini'ye gönderilecek metin
     let promptForGemini = `
     The following is an original prompt from a user: "${originalPrompt}"
     
-    Reference image tags: ${imageTags.join(", ")}
     ${settingsPromptSection}
     
-    This is for a virtual try-on application. I need you to create a specific prompt that says:
+    This is for a virtual try-on application. The combined image shows two parts:
+    - LEFT: Full body model photo showing pose and body structure
+    - RIGHT: Clothing/product that should be virtually tried on
     
-    "Dress @image_1 with items from @image_2. Briefly describe the clothing items and details from @image_2 that will be worn by @image_1."
+    NOTE: The face will be added later through a separate face-swap process, so focus on body and clothing details.
+    
+    CRITICAL VIRTUAL TRY-ON REQUIREMENTS:
+    1. Use the BODY/POSE from the LEFT side of the image  
+    2. Show the PRODUCTS from the RIGHT side being worn by the model body
+    3. Describe the clothing items from the product image in EXTREME DETAIL:
+       - Exact colors, patterns, textures, fabrics
+       - Specific design elements, cuts, silhouettes
+       - Any unique features, embellishments, or details
+       - How the garment fits and drapes on the body
+       - Material appearance (matte, shiny, textured, smooth)
+    4. IMPORTANT: Describe the person's BODY TYPE and PHYSICAL CHARACTERISTICS:
+       - Height (tall, medium, short)
+       - Body build (slim, athletic, curvy, plus-size, etc.)
+       - Body proportions and shape
+       - Overall physique and body structure
+       - How the clothing should fit this specific body type
+    5. Create a seamless virtual try-on where the model from the left is wearing the products from the right
+    
+    CRITICAL CONTENT MODERATION GUIDELINES - AVOID THESE:
+    1. DO NOT mention age descriptors (young, old, teen, etc.)
+    2. DO NOT use detailed body part descriptions (chest, bust, hips, waist details)
+    3. DO NOT use intimate/underwear terminology (bra, panties, lingerie, etc.)
+    4. DO NOT use suggestive clothing descriptions (tight, snug, revealing, etc.)
+    5. DO NOT mention brand names or copyrighted content
+    6. DO NOT use terms that could be sexually suggestive
+    7. AVOID detailed physical attraction descriptions
+    8. Use neutral, professional fashion terminology only
+    9. Focus on clothing style, not body curves or intimate fits
+    10. Keep descriptions professional and suitable for all audiences
+    
+    SAFE ALTERNATIVE TERMS:
+    - Instead of "young woman" → "person" or "model"
+    - Instead of "sports bra" → "athletic top" or "fitted top"
+    - Instead of "tight/snug" → "well-fitted" or "tailored"
+    - Instead of "accentuating curves" → "flattering silhouette"
+    - Instead of body parts → "overall appearance" or "silhouette"
+    - Instead of "toned" → "fit" or "healthy"
+    
+    Create a detailed fashion description prompt that describes:
+    1. The person with the face from the LEFT image and body pose from the MIDDLE image
+    2. DETAILED BODY TYPE DESCRIPTION: Analyze and describe the person's height, build, proportions, and physique (using safe terminology)
+    3. This person wearing the clothing items from the RIGHT side of the image
+    4. Include specific details about the clothing items, colors, styles, and textures
+    5. Include details about the setting, pose, and overall aesthetic
+    6. VERY IMPORTANT: Describe the products from the right side in extensive detail as if they are being worn by the combined person (face + body)
+    7. CRITICAL: Include how the clothing fits and looks on this specific body type and height (using professional language)
     
     STRICT LANGUAGE REQUIREMENTS: 
     - The final prompt must be 100% ENGLISH ONLY - ZERO foreign words allowed
-    - NEVER include Turkish, Arabic, French, Spanish, German, Italian, Japanese, Chinese, Korean, Russian, or any other non-English words
     - ALL non-English words must be translated to English
-    - If you see any non-English word → translate it to English (NOT "Foreign_word" or "Foreign_word/English_word")
-    - NEVER use format like "Non_English_word/English_word" - use ONLY English word
-    - Examples of what NOT to do: "Mutlu/happy", "Sahil/beach", "Triste/sad", "Plage/beach", "Strand/beach"
-    - Examples of what TO do: "happy", "beach", "sad"
-    
-    LOCATION FORMATTING REQUIREMENTS:
-    - If location contains file extensions (.png, .jpg), remove them completely
-    - If location has underscores or hyphens, convert to natural text
-    - "indoor-Classic_English_Library.png" → "classic English library"
-    - "outdoor-Beach_Sunset.jpg" → "beach sunset setting"
-    - "Winter_Forest_Trail.png" → "winter forest trail"
     - Make locations sound natural, not like filenames
+    - Use ONLY professional, family-friendly fashion terminology
+    - AVOID any content that could trigger content moderation systems
     
     CRITICAL REQUIREMENTS:
     1. The output prompt must be PURE ENGLISH - no foreign language words whatsoever
-    2. Always use @image_1 to refer to the person wearing the clothes
-    3. Always use @image_2 to refer to the clothing items to be worn
-    4. DO NOT mention any existing/original clothing on @image_1 
-    5. YOU MUST LIST AND DESCRIBE EVERY SINGLE ITEM visible in @image_2 - NO EXCEPTIONS
-    6. Count how many clothing items and accessories are in @image_2 and make sure ALL are mentioned
-    7. Include ALL types of items: shirts, pants, dresses, shoes, jewelry, glasses, hats, bags, belts, watches, etc.
-    8. If there are multiple items of the same type (e.g., 2 rings, 3 necklaces), mention the exact count
-    9. The @ symbol is mandatory before image references
-    10. NEVER skip or omit any visible clothing item or accessory from @image_2
-    11. Convert locations from filename format to natural descriptive text
-    12. ABSOLUTELY NO foreign language words - translate everything to English
-    13. DO NOT use mixed language formats like "Foreign_word/English_word"
+    2. Combine the face from LEFT + body from MIDDLE + products from RIGHT
+    3. Describe the model wearing the clothing items from the product image with EXTREME DETAIL
+    4. Include ALL types of clothing and accessories visible in the product image
+    5. Make it sound like a professional fashion photography description
+    6. Convert locations from filename format to natural descriptive text
+    7. ABSOLUTELY NO foreign language words - translate everything to English
+    8. Focus heavily on product details: fabric texture, color nuances, design elements, fit characteristics
+    9. Describe how the clothing items from the right side look when worn by the person (face from left + body from middle)
+    10. Create a seamless combination of the three elements: face + body + clothing
+    11. MANDATORY: Always include detailed body type analysis (height, build, proportions) in the description
+    12. Describe how the specific garments complement and fit the person's body type and height
+    13. CRITICAL: Use only content-moderation-safe language and terminology
+    14. AVOID any terms that could be flagged as sensitive or inappropriate
+    15. Focus on professional fashion description, not physical attractiveness
     
-    EXAMPLE FORMAT: "Dress @image_1 with the [specific item 1], [specific item 2], [specific item 3], and [specific item N] from @image_2. The model should be positioned in a [natural location description] setting, conveying a [English emotion] mood in a [English pose description] pose."
-    
-    FORBIDDEN EXAMPLES (DO NOT DO THIS):
-    ❌ "indoor-Classic_English_Library.png setting" 
-    ❌ Any foreign word followed by "/English_word"
-    ❌ Any non-English words in any language
-    
-    CORRECT EXAMPLES (DO THIS):
-    ✅ "classic English library setting"
-    ✅ Pure English words only
-    ✅ Natural descriptive language
-    
-    Your output should ONLY be the virtual try-on prompt in PURE ENGLISH that includes EVERY SINGLE ITEM from @image_2${
+    Your output should ONLY be the virtual try-on prompt in PURE ENGLISH that describes the complete fashion look with extensive product details, body type analysis, and physical characteristics using SAFE, PROFESSIONAL terminology${
       hasValidSettings
         ? " and incorporates relevant user settings (converted to natural English descriptions)"
         : ""
@@ -474,43 +488,33 @@ async function enhancePromptWithGemini(
     // Resim verilerini içerecek parts dizisini hazırla
     const parts = [{ text: promptForGemini }];
 
-    // Referans resimleri varsa, bu resimleri Gemini'ye gönder
-    // Not: Burada maksimum 10 resim sınırlaması var, o yüzden ilk 10 resmi alıyoruz
-    const maxImagesToSend = Math.min(referenceImages.length, 10);
-
-    if (maxImagesToSend > 0) {
+    // Birleştirilmiş görseli Gemini'ye gönder
+    try {
       console.log(
-        `Gemini'ye ${maxImagesToSend} adet referans görsel gönderiliyor`
+        `Birleştirilmiş görsel Gemini'ye gönderiliyor: ${combinedImageUrl}`
       );
 
-      for (let i = 0; i < maxImagesToSend; i++) {
-        try {
-          const imageUrl = referenceImages[i].uri;
-          console.log(`Görsel yükleniyor: ${imageUrl}`);
+      const imageResponse = await got(combinedImageUrl, {
+        responseType: "buffer",
+      });
+      const imageBuffer = imageResponse.body;
 
-          // URL'den görüntüyü indir (Bu görüntüler zaten üzerinde metin eklenmiş haldedir)
-          const imageResponse = await got(imageUrl, { responseType: "buffer" });
-          const imageBuffer = imageResponse.body;
+      // Base64'e çevir
+      const base64Image = imageBuffer.toString("base64");
 
-          // Base64'e çevir
-          const base64Image = imageBuffer.toString("base64");
+      parts.push({
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: base64Image,
+        },
+      });
 
-          // Görsel verilerini parts dizisine ekle
-          parts.push({
-            inlineData: {
-              mimeType: "image/png",
-              data: base64Image,
-            },
-          });
-
-          console.log(`${i + 1}. görsel başarıyla yüklendi ve hazırlandı`);
-        } catch (imageError) {
-          console.error(`Görsel yüklenirken hata: ${imageError.message}`);
-        }
-      }
+      console.log("Birleştirilmiş görsel başarıyla Gemini'ye yüklendi");
+    } catch (imageError) {
+      console.error(`Görsel yüklenirken hata: ${imageError.message}`);
     }
 
-    // Gemini'den cevap al - resimlerle birlikte
+    // Gemini'den cevap al
     const result = await model.generateContent({
       contents: [{ parts }],
     });
@@ -518,89 +522,66 @@ async function enhancePromptWithGemini(
     let enhancedPrompt = result.response.text().trim();
 
     console.log(
-      "🤖 [BACKEND GEMINI] Gemini'nin ilk ürettiği prompt:",
+      "🤖 [BACKEND GEMINI] Gemini'nin ürettiği prompt:",
       enhancedPrompt
     );
-
-    if (hasValidSettings) {
-      console.log(
-        "🎛️ [BACKEND GEMINI] Settings dahil edilmiş mi kontrol ediliyor..."
-      );
-    }
-
-    console.log(
-      "📁 [BACKEND GEMINI] Dosya formatları temizlendi mi kontrol ediliyor..."
-    );
-
-    // Dosya uzantısı kontrolü
-    const fileExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
-    const foundFileExtensions = fileExtensions.filter((ext) =>
-      enhancedPrompt.includes(ext)
-    );
-
-    // Dosya formatı kontrolü (underscore, hyphen)
-    const fileFormatPattern = /[a-zA-Z]+-[A-Z][a-zA-Z_]+\.(png|jpg|jpeg)/g;
-    const foundFileFormats = enhancedPrompt.match(fileFormatPattern) || [];
-
-    if (foundFileExtensions.length > 0) {
-      console.log(
-        "⚠️ [BACKEND GEMINI] Dosya uzantıları bulundu:",
-        foundFileExtensions
-      );
-    } else {
-      console.log("✅ [BACKEND GEMINI] Dosya uzantıları temizlenmiş görünüyor");
-    }
-
-    if (foundFileFormats.length > 0) {
-      console.log(
-        "⚠️ [BACKEND GEMINI] Dosya formatları bulundu:",
-        foundFileFormats
-      );
-    } else {
-      console.log("✅ [BACKEND GEMINI] Dosya formatları temizlenmiş görünüyor");
-    }
-
-    // Güvenlik kontrolü: Eğer Gemini tag'lerin başına @ eklemediyse manuel olarak ekleyelim
-    if (imageTags.length > 0) {
-      // Her bir image tag için kontrol
-      imageTags.forEach((tag) => {
-        // Eğer tag prompt içinde varsa ve başında @ yoksa
-        const tagRegex = new RegExp(`(?<!@)\\b${tag}\\b`, "g");
-        if (tagRegex.test(enhancedPrompt)) {
-          enhancedPrompt = enhancedPrompt.replace(tagRegex, `@${tag}`);
-        }
-      });
-    }
-
-    console.log(
-      "Gemini tarafından iyileştirilmiş ve @ kontrolü yapılmış prompt:",
-      enhancedPrompt
-    );
-
-    console.log(
-      "✅ [BACKEND GEMINI] Final enhanced prompt tamamlandı:",
-      enhancedPrompt
-    );
-
-    if (hasValidSettings) {
-      console.log(
-        "🎯 [BACKEND GEMINI] Settings başarıyla Gemini'ye gönderildi ve işlendi"
-      );
-    } else {
-      console.log(
-        "🎯 [BACKEND GEMINI] Settings olmadığı için sadece temel prompt işlendi"
-      );
-    }
 
     return enhancedPrompt;
   } catch (error) {
     console.error("Prompt iyileştirme hatası:", error);
-    // Hata durumunda orijinal prompt'u döndür
     return originalPrompt;
   }
 }
 
-// RunwayML client'ı oluştur
+// Replicate prediction durumunu kontrol eden fonksiyon
+async function pollReplicateResult(predictionId, maxAttempts = 60) {
+  console.log(`Replicate prediction polling başlatılıyor: ${predictionId}`);
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const response = await got.get(
+        `https://api.replicate.com/v1/predictions/${predictionId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          responseType: "json",
+        }
+      );
+
+      const result = response.body;
+      console.log(`Polling attempt ${attempt + 1}: status = ${result.status}`);
+
+      if (result.status === "succeeded") {
+        console.log("Replicate işlemi başarıyla tamamlandı");
+        return result;
+      } else if (result.status === "failed") {
+        console.error("Replicate işlemi başarısız:", result.error);
+        throw new Error(result.error || "Replicate processing failed");
+      } else if (result.status === "canceled") {
+        console.error("Replicate işlemi iptal edildi");
+        throw new Error("Replicate processing was canceled");
+      }
+
+      // Processing veya starting durumundaysa bekle
+      if (result.status === "processing" || result.status === "starting") {
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // 2 saniye bekle
+        continue;
+      }
+    } catch (error) {
+      console.error(`Polling attempt ${attempt + 1} hatası:`, error.message);
+      if (attempt === maxAttempts - 1) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+
+  throw new Error("Replicate işlemi zaman aşımına uğradı");
+}
+
+// Ana generate endpoint'i
 router.post("/generate", async (req, res) => {
   try {
     const { ratio, promptText, referenceImages, settings, userId } = req.body;
@@ -609,179 +590,261 @@ router.post("/generate", async (req, res) => {
       !promptText ||
       !referenceImages ||
       !Array.isArray(referenceImages) ||
-      referenceImages.length === 0
+      referenceImages.length < 3
     ) {
       return res.status(400).json({
         success: false,
         result: {
           message:
-            "Geçerli bir promptText ve en az bir referenceImage sağlanmalıdır.",
+            "Geçerli bir promptText ve en az 3 referenceImage (face + model + product) sağlanmalıdır.",
         },
       });
     }
 
-    // Settings parametresini backend'de log'la
     console.log("🎛️ [BACKEND] Gelen settings parametresi:", settings);
     console.log("📝 [BACKEND] Gelen promptText:", promptText);
-    console.log("🔍 [BACKEND] Settings detay incelemesi:");
-    if (settings) {
-      console.log("   - Location:", settings.location);
-      console.log("   - Season:", settings.season);
-      console.log("   - Hair Style:", settings.hairStyle);
-      console.log("   - Hair Color:", settings.hairColor);
-      console.log("   - Accessories:", settings.accessories);
-      console.log("   - Perspective:", settings.perspective);
-      console.log("   - Mood:", settings.mood);
-      console.log("   - Pose:", settings.pose);
-      console.log("   - Details:", settings.details);
-      console.log("   - Prompt:", settings.prompt);
-      console.log("   - Ratio:", settings.ratio);
-    } else {
-      console.log("❌ [BACKEND] Settings parametresi boş veya undefined!");
+
+    // İlk üç görseli al (face + model + product)
+    const faceImage = referenceImages.find((img) => img.tag === "image_1");
+    const modelImage = referenceImages.find((img) => img.tag === "image_2");
+    const productImage = referenceImages.find((img) => img.tag === "image_3");
+
+    if (!faceImage || !modelImage || !productImage) {
+      return res.status(400).json({
+        success: false,
+        result: {
+          message:
+            "Face görseli (image_1), model görseli (image_2) ve ürün görseli (image_3) gereklidir.",
+        },
+      });
     }
 
-    // Referans görsellerinin oran doğrulaması
-    console.log(
-      `${referenceImages.length} adet referans görsel alındı. Server tarafında normalize edilecek.`
+    console.log("Face görseli:", faceImage.uri);
+    console.log("Model görseli:", modelImage.uri);
+    console.log("Ürün görseli:", productImage.uri);
+
+    // 3 görseli birleştir (Gemini analizi için)
+    const combinedImageUrlForGemini = await combineImagesHorizontally(
+      faceImage.uri,
+      modelImage.uri,
+      productImage.uri
     );
 
-    // Tüm görselleri normalize et
-    const normalizedImages = [];
-    for (const img of referenceImages) {
-      try {
-        // Görseli normalize et
-        const normalizedUrl = await normalizeImage(img.uri);
+    // Sadece model + product birleştir (Flux API için)
+    const combinedImageUrlForFlux = await combineModelAndProduct(
+      modelImage.uri,
+      productImage.uri
+    );
 
-        // Normalize edilmiş görsele metin ekle (img.tag'i sağ alt köşeye yaz)
-        const processedUrl = await addTextToImage(normalizedUrl, img.tag);
+    console.log(
+      "Gemini için birleştirilmiş görsel URL'si:",
+      combinedImageUrlForGemini
+    );
+    console.log(
+      "Flux için birleştirilmiş görsel URL'si:",
+      combinedImageUrlForFlux
+    );
 
-        // İşlenmiş görseli diziye ekle
-        normalizedImages.push({
-          uri: processedUrl,
-          tag: img.tag,
-        });
-
-        console.log(`Görsel normalize edildi ve metin eklendi: ${img.tag}`);
-      } catch (error) {
-        console.error(`Görsel işlenemedi: ${img.tag}`, error);
-        // Hata durumunda orijinal görseli kullan
-        normalizedImages.push(img);
-      }
-    }
-
-    console.log(`${normalizedImages.length} adet görsel normalize edildi.`);
-
-    // Ratio'yu formatla
-    const formattedRatio = formatRatio(ratio || "1080:1920");
+    // Aspect ratio'yu formatla
+    const formattedRatio = formatAspectRatio(ratio || "9:16");
     console.log(
       `İstenen ratio: ${ratio}, formatlanmış ratio: ${formattedRatio}`
     );
 
-    // Kullanıcının prompt'unu Gemini ile iyileştir - settings parametresi de ekledik
+    // Kullanıcının prompt'unu Gemini ile iyileştir (3 görsel birleşimini kullan)
     const enhancedPrompt = await enhancePromptWithGemini(
       promptText,
-      normalizedImages, // Normalize edilmiş görselleri kullan
-      settings || {} // settings yoksa boş obje gönder
+      combinedImageUrlForGemini,
+      settings || {}
     );
 
-    console.log(
-      "🎛️ [BACKEND MAIN] Settings enhancePromptWithGemini'ye gönderildi:",
-      settings
-    );
     console.log("📝 [BACKEND MAIN] Original prompt:", promptText);
-    console.log(
-      "✨ [BACKEND MAIN] Enhanced prompt (settings dahil):",
-      enhancedPrompt
+    console.log("✨ [BACKEND MAIN] Enhanced prompt:", enhancedPrompt);
+
+    // Replicate API'ye istek gönder - sadece model + product görseli kullan
+    const replicateResponse = await got.post(
+      "https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-max/predictions",
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        json: {
+          input: {
+            prompt: enhancedPrompt,
+            input_image: combinedImageUrlForFlux, // Face olmadan sadece model + product
+            aspect_ratio: formattedRatio,
+          },
+        },
+        responseType: "json",
+      }
     );
 
-    // RunwayML client oluştur
-    const client = new RunwayML({ apiKey: process.env.RUNWAY_API_KEY });
+    const initialResult = replicateResponse.body;
+    console.log("Replicate API başlangıç yanıtı:", initialResult);
 
-    // Özet bilgileri logla
-    console.log("Resim oluşturma isteği başlatılıyor:", {
-      model: "gen4_image",
-      ratio: formattedRatio,
-      promptText: enhancedPrompt, // İyileştirilmiş prompt'u kullan
-      referenceImagesCount: normalizedImages.length,
-    });
-
-    // RunwayML'e gönderilen tam veri yapısını logla
-    console.log("RunwayML'e gönderilen tam veri yapısı:", {
-      model: "gen4_image",
-      ratio: formattedRatio,
-      promptText: enhancedPrompt,
-      referenceImages: normalizedImages.map((img) => ({
-        uri: img.uri,
-        tag: img.tag,
-      })),
-    });
-
-    // Resim oluşturma görevi oluştur
-    let task = await client.textToImage.create({
-      model: "gen4_image",
-      ratio: formattedRatio,
-      promptText: enhancedPrompt, // İyileştirilmiş prompt'u kullan
-      referenceImages: normalizedImages, // Normalize edilmiş görselleri kullan
-    });
-
-    console.log("Görev başlatıldı, görev ID:", task.id);
-
-    // İşlemin durumunu kontrol et (polling)
-    let timeoutCount = 0;
-    const maxTimeouts = 120; // 60 saniye maksimum bekleme süresi
-
-    while (
-      !["SUCCEEDED", "FAILED"].includes(task.status) &&
-      timeoutCount < maxTimeouts
-    ) {
-      // 1 saniye bekle
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      timeoutCount++;
-
-      // Görev durumunu güncelle
-      task = await client.tasks.retrieve(task.id);
-      console.log(`Görev durumu kontrolü (${timeoutCount}): ${task.status}`);
-    }
-
-    if (task.status === "SUCCEEDED") {
-      console.log("Görev başarıyla tamamlandı");
-
-      // Sonuç verisini hazırla
-      const responseData = {
-        success: true,
-        result: {
-          task,
-          imageUrl: task.output[0],
-          originalPrompt: promptText,
-          enhancedPrompt: enhancedPrompt,
-        },
-      };
-
-      // Sonucu veritabanına kaydet
-      await saveGenerationToDatabase(
-        userId,
-        responseData,
-        promptText,
-        normalizedImages
-      );
-
-      return res.status(200).json(responseData);
-    } else if (task.status === "FAILED") {
-      console.error("Görev başarısız oldu:", task.error);
+    if (!initialResult.id) {
+      console.error("Replicate prediction ID alınamadı:", initialResult);
       return res.status(500).json({
         success: false,
         result: {
-          message: "Resim oluşturma görevi başarısız oldu",
-          error: task.error,
+          message: "Replicate prediction başlatılamadı",
+          error: initialResult.error || "Prediction ID missing",
         },
       });
+    }
+
+    // Prediction durumunu polling ile takip et
+    const finalResult = await pollReplicateResult(initialResult.id);
+
+    console.log("Replicate final result:", finalResult);
+
+    if (finalResult.status === "succeeded" && finalResult.output) {
+      console.log("Replicate API işlemi başarılı");
+
+      // Face-swap işlemi için face fotoğrafını al
+      const faceImageUrl = faceImage.uri;
+      const fluxOutputUrl = finalResult.output;
+
+      console.log("🔄 Face-swap işlemi başlatılıyor...");
+      console.log("👤 Face image:", faceImageUrl);
+      console.log("🎨 Flux output:", fluxOutputUrl);
+
+      try {
+        // Face-swap API'sine istek gönder
+        const faceSwapResponse = await got.post(
+          "https://api.replicate.com/v1/predictions",
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
+              "Content-Type": "application/json",
+            },
+            json: {
+              version:
+                "cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111",
+              input: {
+                swap_image: faceImageUrl, // Face fotoğrafı
+                input_image: fluxOutputUrl, // Flux-kontext sonucu
+              },
+            },
+            responseType: "json",
+          }
+        );
+
+        const faceSwapInitial = faceSwapResponse.body;
+        console.log("Face-swap API başlangıç yanıtı:", faceSwapInitial);
+
+        if (!faceSwapInitial.id) {
+          console.error("Face-swap prediction ID alınamadı:", faceSwapInitial);
+          // Face-swap başarısız olursa orijinal flux sonucunu döndür
+          const responseData = {
+            success: true,
+            result: {
+              imageUrl: fluxOutputUrl,
+              originalPrompt: promptText,
+              enhancedPrompt: enhancedPrompt,
+              replicateData: finalResult,
+              faceSwapError:
+                "Face-swap başlatılamadı, orijinal sonuç döndürülüyor",
+            },
+          };
+
+          await saveGenerationToDatabase(
+            userId,
+            responseData,
+            promptText,
+            referenceImages
+          );
+
+          return res.status(200).json(responseData);
+        }
+
+        // Face-swap prediction durumunu polling ile takip et
+        console.log(`🔄 Face-swap polling başlatılıyor: ${faceSwapInitial.id}`);
+        const faceSwapResult = await pollReplicateResult(faceSwapInitial.id);
+
+        console.log("Face-swap final result:", faceSwapResult);
+
+        if (faceSwapResult.status === "succeeded" && faceSwapResult.output) {
+          console.log("✅ Face-swap API işlemi başarılı");
+
+          // Face-swap sonucunu client'e gönder
+          const responseData = {
+            success: true,
+            result: {
+              imageUrl: faceSwapResult.output, // Face-swap sonucu
+              originalPrompt: promptText,
+              enhancedPrompt: enhancedPrompt,
+              replicateData: finalResult,
+              faceSwapData: faceSwapResult,
+              originalFluxOutput: fluxOutputUrl, // Orijinal flux sonucunu da sakla
+            },
+          };
+
+          await saveGenerationToDatabase(
+            userId,
+            responseData,
+            promptText,
+            referenceImages
+          );
+
+          return res.status(200).json(responseData);
+        } else {
+          console.error("Face-swap API başarısız:", faceSwapResult);
+          // Face-swap başarısız olursa orijinal flux sonucunu döndür
+          const responseData = {
+            success: true,
+            result: {
+              imageUrl: fluxOutputUrl,
+              originalPrompt: promptText,
+              enhancedPrompt: enhancedPrompt,
+              replicateData: finalResult,
+              faceSwapError:
+                faceSwapResult.error ||
+                "Face-swap işlemi başarısız, orijinal sonuç döndürülüyor",
+            },
+          };
+
+          await saveGenerationToDatabase(
+            userId,
+            responseData,
+            promptText,
+            referenceImages
+          );
+
+          return res.status(200).json(responseData);
+        }
+      } catch (faceSwapError) {
+        console.error("Face-swap API hatası:", faceSwapError);
+        // Face-swap hatası olursa orijinal flux sonucunu döndür
+        const responseData = {
+          success: true,
+          result: {
+            imageUrl: fluxOutputUrl,
+            originalPrompt: promptText,
+            enhancedPrompt: enhancedPrompt,
+            replicateData: finalResult,
+            faceSwapError: `Face-swap hatası: ${faceSwapError.message}, orijinal sonuç döndürülüyor`,
+          },
+        };
+
+        await saveGenerationToDatabase(
+          userId,
+          responseData,
+          promptText,
+          referenceImages
+        );
+
+        return res.status(200).json(responseData);
+      }
     } else {
-      console.error("Görev zaman aşımına uğradı");
-      return res.status(408).json({
+      console.error("Replicate API başarısız:", finalResult);
+      return res.status(500).json({
         success: false,
         result: {
-          message: "Resim oluşturma görevi zaman aşımına uğradı",
-          taskId: task.id,
+          message: "Replicate API işlemi başarısız oldu",
+          error: finalResult.error || "Bilinmeyen hata",
+          status: finalResult.status,
         },
       });
     }
@@ -791,140 +854,6 @@ router.post("/generate", async (req, res) => {
       success: false,
       result: {
         message: "Resim oluşturma sırasında bir hata oluştu",
-        error: error.message,
-      },
-    });
-  }
-});
-
-// Örnek referans resimlerle test endpoint'i
-router.get("/test", async (req, res) => {
-  try {
-    const client = new RunwayML({ apiKey: process.env.RUNWAY_API_KEY });
-
-    // Test için örnek resimler
-    const testPrompt = "Eiffel Tower painted in the style of Starry Night";
-    const testReferenceImages = [
-      {
-        uri: "https://upload.wikimedia.org/wikipedia/commons/8/85/Tour_Eiffel_Wikimedia_Commons_(cropped).jpg",
-        tag: "EiffelTower",
-      },
-      {
-        uri: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/1513px-Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg",
-        tag: "StarryNight",
-      },
-    ];
-
-    // Test için prompt'u iyileştir
-    const enhancedTestPrompt = await enhancePromptWithGemini(
-      testPrompt,
-      testReferenceImages
-    );
-    console.log("İyileştirilmiş test promptu:", enhancedTestPrompt);
-
-    console.log("Test işlemi başlatılıyor");
-
-    // Test için ratio formatla
-    const testRatio = formatRatio("1080:1920");
-
-    // Resim oluşturma görevi oluştur
-    let task = await client.textToImage.create({
-      model: "gen4_image",
-      ratio: testRatio,
-      promptText: enhancedTestPrompt, // İyileştirilmiş prompt'u kullan
-      referenceImages: testReferenceImages,
-    });
-
-    console.log("Test görevi başlatıldı, görev ID:", task.id);
-
-    // İşlemin durumunu kontrol et
-    let timeoutCount = 0;
-    const maxTimeouts = 30; // 30 saniye maksimum bekleme süresi
-
-    while (
-      !["SUCCEEDED", "FAILED"].includes(task.status) &&
-      timeoutCount < maxTimeouts
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      timeoutCount++;
-      task = await client.tasks.retrieve(task.id);
-      console.log(
-        `Test görevi durumu kontrolü (${timeoutCount}): ${task.status}`
-      );
-    }
-
-    if (task.status === "SUCCEEDED") {
-      console.log("Test görevi başarıyla tamamlandı");
-      return res.status(200).json({
-        success: true,
-        result: {
-          task,
-          imageUrl: task.output[0],
-          originalPrompt: testPrompt,
-          enhancedPrompt: enhancedTestPrompt,
-        },
-      });
-    } else if (task.status === "FAILED") {
-      console.error("Test görevi başarısız oldu:", task.error);
-      return res.status(500).json({
-        success: false,
-        result: {
-          message: "Test resmi oluşturma görevi başarısız oldu",
-          error: task.error,
-        },
-      });
-    } else {
-      console.error("Test görevi zaman aşımına uğradı");
-      return res.status(408).json({
-        success: false,
-        result: {
-          message: "Test resmi oluşturma görevi zaman aşımına uğradı",
-          taskId: task.id,
-        },
-      });
-    }
-  } catch (error) {
-    console.error("Test hatası:", error);
-    return res.status(500).json({
-      success: false,
-      result: {
-        message: "Test sırasında bir hata oluştu",
-        error: error.message,
-      },
-    });
-  }
-});
-
-// Görev durumunu kontrol etmek için endpoint
-router.get("/task/:taskId", async (req, res) => {
-  try {
-    const { taskId } = req.params;
-
-    if (!taskId) {
-      return res.status(400).json({
-        success: false,
-        result: {
-          message: "Görev ID'si gereklidir",
-        },
-      });
-    }
-
-    const client = new RunwayML();
-    const task = await client.tasks.retrieve(taskId);
-
-    return res.status(200).json({
-      success: true,
-      result: {
-        task,
-        imageUrl: task.status === "SUCCEEDED" ? task.output[0] : null,
-      },
-    });
-  } catch (error) {
-    console.error("Görev durumu kontrolü hatası:", error);
-    return res.status(500).json({
-      success: false,
-      result: {
-        message: "Görev durumu kontrolü sırasında bir hata oluştu",
         error: error.message,
       },
     });
