@@ -525,6 +525,21 @@ async function pollReplicateResult(predictionId, maxAttempts = 60) {
         return result;
       } else if (result.status === "failed") {
         console.error("Replicate işlemi başarısız:", result.error);
+        // Content moderation hatası kontrolü - E005 kodu veya sensitive content
+        if (
+          result.error &&
+          (result.error.includes("E005") ||
+            result.error.includes("flagged as sensitive") ||
+            result.error.includes("content policy") ||
+            result.error.includes("violates") ||
+            result.error.includes("inappropriate"))
+        ) {
+          console.error(
+            "🚫 Content moderation hatası tespit edildi, pooling hemen durduruluyor:",
+            result.error
+          );
+          throw new Error(`Content Moderation Error: ${result.error}`);
+        }
         throw new Error(result.error || "Replicate processing failed");
       } else if (result.status === "canceled") {
         console.error("Replicate işlemi iptal edildi");
@@ -537,6 +552,19 @@ async function pollReplicateResult(predictionId, maxAttempts = 60) {
         continue;
       }
     } catch (error) {
+      // Eğer hata "failed" status'undan geliyorsa, tekrar deneme
+      if (
+        error.message.includes("Replicate processing failed") ||
+        error.message.includes("Replicate processing was canceled") ||
+        error.message.includes("Content Moderation Error")
+      ) {
+        console.error(
+          "Replicate işlemi kesin olarak başarısız, pooling durduruluyor:",
+          error.message
+        );
+        throw error; // Hemen hata fırlat, tekrar deneme
+      }
+
       console.error(`Polling attempt ${attempt + 1} hatası:`, error.message);
       if (attempt === maxAttempts - 1) {
         throw error;
