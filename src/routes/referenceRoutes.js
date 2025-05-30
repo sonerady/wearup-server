@@ -73,16 +73,16 @@ async function combineImagesHorizontally(image1Url, image2Url, image3Url) {
       .resize(width2, targetHeight, {
         fit: "cover",
         position: "center",
-        })
-        .toBuffer();
+      })
+      .toBuffer();
 
     // Üçüncü görüntüyü yeniden boyutlandır (product)
     const resizedBuffer3 = await sharp(buffer3)
       .resize(width3, targetHeight, {
         fit: "cover",
         position: "center",
-        })
-        .toBuffer();
+      })
+      .toBuffer();
 
     // Görüntüleri yan yana birleştir
     const combinedBuffer = await sharp({
@@ -264,7 +264,7 @@ async function saveGenerationToDatabase(
           image_url: data.result.imageUrl,
           prompt: originalPrompt,
           enhanced_prompt: data.result.enhancedPrompt,
-          reference_images: referenceImages.map((img) => img.uri),
+          reference_images: referenceImages,
           created_at: new Date().toISOString(),
         },
       ]);
@@ -366,13 +366,13 @@ async function enhancePromptWithGemini(
     let settingsPromptSection = "";
 
     if (hasValidSettings) {
-    const settingsText = Object.entries(settings)
+      const settingsText = Object.entries(settings)
         .filter(
           ([key, value]) =>
             value !== null && value !== undefined && value !== ""
         )
-      .map(([key, value]) => `${key}: ${value}`)
-      .join(", ");
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(", ");
 
       console.log("🎛️ [BACKEND GEMINI] Settings için prompt oluşturuluyor...");
       console.log("📝 [BACKEND GEMINI] Settings text:", settingsText);
@@ -396,89 +396,56 @@ async function enhancePromptWithGemini(
 
     // Gemini'ye gönderilecek metin
     let promptForGemini = `
-    The following is an original prompt from a user: "${originalPrompt}"
+    The following is an original prompt from a user: "${
+      originalPrompt || "Create an artistic image"
+    }"
     
     ${settingsPromptSection}
     
-    This is for a virtual try-on application. The combined image shows two parts:
-    - LEFT: Full body model photo showing pose and body structure
-    - RIGHT: Clothing/product that should be virtually tried on
+    You are looking at a combined image that shows multiple photos with LABELS underneath each photo. Your task is to create a description for ONE SINGLE ARTISTIC IMAGE featuring the MAIN CHARACTER with all other elements applied to them.
     
-    NOTE: The face will be added later through a separate face-swap process, so focus on body and clothing details.
+    IMPORTANT UNDERSTANDING:
+    - Photo labeled "MAIN CHARACTER" = This is the ONLY PERSON in the final image
+    - Photos labeled "ITEM" = These should be applied to/used by the main character (clothing, accessories, backgrounds, objects, etc.)
     
-    CRITICAL VIRTUAL TRY-ON REQUIREMENTS:
-    1. Use the BODY/POSE from the LEFT side of the image  
-    2. Show the PRODUCTS from the RIGHT side being worn by the model body
-    3. Describe the clothing items from the product image in EXTREME DETAIL:
-       - Exact colors, patterns, textures, fabrics
-       - Specific design elements, cuts, silhouettes
-       - Any unique features, embellishments, or details
-       - How the garment fits and drapes on the body
-       - Material appearance (matte, shiny, textured, smooth)
-    4. IMPORTANT: Describe the person's BODY TYPE and PHYSICAL CHARACTERISTICS:
-       - Height (tall, medium, short)
-       - Body build (slim, athletic, curvy, plus-size, etc.)
-       - Body proportions and shape
-       - Overall physique and body structure
-       - How the clothing should fit this specific body type
-    5. Create a seamless virtual try-on where the model from the left is wearing the products from the right
+    MAIN TASK:
+    - Take the MAIN CHARACTER (first photo) as your only person
+    - Apply all ITEMS to this character in appropriate ways:
+      * Clothing items should be WORN by the character
+      * Background scenes should be the SETTING/ENVIRONMENT
+      * Accessories/objects should be held, worn, or placed around the character
+    - Create ONE FINAL ARTISTIC IMAGE with only ONE PERSON
     
-    CRITICAL CONTENT MODERATION GUIDELINES - AVOID THESE:
-    1. DO NOT mention age descriptors (young, old, teen, etc.)
-    2. DO NOT use detailed body part descriptions (chest, bust, hips, waist details)
-    3. DO NOT use intimate/underwear terminology (bra, panties, lingerie, etc.)
-    4. DO NOT use suggestive clothing descriptions (tight, snug, revealing, etc.)
-    5. DO NOT mention brand names or copyrighted content
-    6. DO NOT use terms that could be sexually suggestive
-    7. AVOID detailed physical attraction descriptions
-    8. Use neutral, professional fashion terminology only
-    9. Focus on clothing style, not body curves or intimate fits
-    10. Keep descriptions professional and suitable for all audiences
+    ARTISTIC PHOTOGRAPHY REQUIREMENTS:
+    1. ARTISTIC COMPOSITION: Create visually stunning, magazine-quality imagery
+    2. PROFESSIONAL LIGHTING: Describe sophisticated lighting setup (natural, studio, golden hour, etc.)
+    3. AESTHETIC APPEAL: Focus on beauty, elegance, and visual impact
+    4. CREATIVE ANGLES: Suggest interesting perspectives and compositions
+    5. COLOR HARMONY: Describe cohesive color palettes and tones
+    6. MOOD & ATMOSPHERE: Create emotional depth and artistic ambiance
+    7. HIGH-END QUALITY: Think luxury fashion photography, art gallery pieces
     
-    SAFE ALTERNATIVE TERMS:
-    - Instead of "young woman" → "person" or "model"
-    - Instead of "sports bra" → "athletic top" or "fitted top"
-    - Instead of "tight/snug" → "well-fitted" or "tailored"
-    - Instead of "accentuating curves" → "flattering silhouette"
-    - Instead of body parts → "overall appearance" or "silhouette"
-    - Instead of "toned" → "fit" or "healthy"
+    CRITICAL GUIDELINES:
+    1. ONLY ONE PERSON: The main character is the ONLY human in the image
+    2. APPLY ALL ITEMS: Each ITEM should be integrated with the main character appropriately
+    3. UNIFIED SCENE: Everything should look naturally integrated in one artistic photo
+    4. NO SEPARATE PEOPLE: Don't describe multiple people - combine everything onto the main character
+    5. ARTISTIC VISION: Think like a professional photographer creating a portfolio piece
     
-    Create a detailed fashion description prompt that describes:
-    1. The person with the face from the LEFT image and body pose from the MIDDLE image
-    2. DETAILED BODY TYPE DESCRIPTION: Analyze and describe the person's height, build, proportions, and physique (using safe terminology)
-    3. This person wearing the clothing items from the RIGHT side of the image
-    4. Include specific details about the clothing items, colors, styles, and textures
-    5. Include details about the setting, pose, and overall aesthetic
-    6. VERY IMPORTANT: Describe the products from the right side in extensive detail as if they are being worn by the combined person (face + body)
-    7. CRITICAL: Include how the clothing fits and looks on this specific body type and height (using professional language)
+    EXAMPLE APPROACH:
+    If you see: [Main Character] + [ITEM: Dress] + [ITEM: Desert Scene] + [ITEM: Jewelry]
+    Create: "An artistic portrait of [describe main character] elegantly wearing [dress description] and [jewelry description] in a beautifully composed [desert scene], featuring professional lighting and sophisticated visual aesthetics"
     
-    STRICT LANGUAGE REQUIREMENTS: 
-    - The final prompt must be 100% ENGLISH ONLY - ZERO foreign words allowed
-    - ALL non-English words must be translated to English
-    - Make locations sound natural, not like filenames
-    - Use ONLY professional, family-friendly fashion terminology
-    - AVOID any content that could trigger content moderation systems
+    LANGUAGE REQUIREMENTS:
+    - Output must be 100% ENGLISH ONLY
+    - Use sophisticated, artistic language
+    - Focus on visual harmony, artistic composition, and aesthetic appeal
+    - Describe ONE PERSON with all ITEMs applied to them
+    - Include professional photography terms when appropriate
     
-    CRITICAL REQUIREMENTS:
-    1. The output prompt must be PURE ENGLISH - no foreign language words whatsoever
-    2. Combine the face from LEFT + body from MIDDLE + products from RIGHT
-    3. Describe the model wearing the clothing items from the product image with EXTREME DETAIL
-    4. Include ALL types of clothing and accessories visible in the product image
-    5. Make it sound like a professional fashion photography description
-    6. Convert locations from filename format to natural descriptive text
-    7. ABSOLUTELY NO foreign language words - translate everything to English
-    8. Focus heavily on product details: fabric texture, color nuances, design elements, fit characteristics
-    9. Describe how the clothing items from the right side look when worn by the person (face from left + body from middle)
-    10. Create a seamless combination of the three elements: face + body + clothing
-    11. MANDATORY: Always include detailed body type analysis (height, build, proportions) in the description
-    12. Describe how the specific garments complement and fit the person's body type and height
-    13. CRITICAL: Use only content-moderation-safe language and terminology
-    14. AVOID any terms that could be flagged as sensitive or inappropriate
-    15. Focus on professional fashion description, not physical attractiveness
-    
-    Your output should ONLY be the virtual try-on prompt in PURE ENGLISH that describes the complete fashion look with extensive product details, body type analysis, and physical characteristics using SAFE, PROFESSIONAL terminology${
+    Your output should ONLY be a detailed English description of ONE ARTISTIC IMAGE featuring the MAIN CHARACTER with all ITEMs (clothing, background, objects, accessories) naturally integrated with them${
       hasValidSettings
-        ? " and incorporates relevant user settings (converted to natural English descriptions)"
+        ? " while incorporating the user's selected settings"
         : ""
     }.
     `;
@@ -497,21 +464,21 @@ async function enhancePromptWithGemini(
       const imageResponse = await got(combinedImageUrl, {
         responseType: "buffer",
       });
-          const imageBuffer = imageResponse.body;
+      const imageBuffer = imageResponse.body;
 
-          // Base64'e çevir
-          const base64Image = imageBuffer.toString("base64");
+      // Base64'e çevir
+      const base64Image = imageBuffer.toString("base64");
 
-          parts.push({
-            inlineData: {
+      parts.push({
+        inlineData: {
           mimeType: "image/jpeg",
-              data: base64Image,
-            },
-          });
+          data: base64Image,
+        },
+      });
 
       console.log("Birleştirilmiş görsel başarıyla Gemini'ye yüklendi");
-        } catch (imageError) {
-          console.error(`Görsel yüklenirken hata: ${imageError.message}`);
+    } catch (imageError) {
+      console.error(`Görsel yüklenirken hata: ${imageError.message}`);
     }
 
     // Gemini'den cevap al
@@ -581,69 +548,434 @@ async function pollReplicateResult(predictionId, maxAttempts = 60) {
   throw new Error("Replicate işlemi zaman aşımına uğradı");
 }
 
+// Çoklu görseli yan yana birleştiren fonksiyon (dinamik sayıda)
+async function combineMultipleImages(imageUrls) {
+  try {
+    if (!imageUrls || imageUrls.length === 0) {
+      throw new Error("En az bir görsel URL'i gereklidir");
+    }
+
+    console.log(
+      `${imageUrls.length} görsel yan yana birleştiriliyor:`,
+      imageUrls
+    );
+
+    // Tüm görüntüleri indir
+    const buffers = await Promise.all(
+      imageUrls.map((url) => got(url).buffer())
+    );
+
+    // Görüntü bilgilerini al
+    const metadatas = await Promise.all(
+      buffers.map((buffer) => sharp(buffer).metadata())
+    );
+
+    // Hedef boyutları hesapla - eşit yükseklik, yan yana
+    const targetHeight = Math.max(...metadatas.map((m) => m.height));
+    const widths = metadatas.map((m, i) =>
+      Math.round(targetHeight * (m.width / m.height))
+    );
+    const totalWidth = widths.reduce((sum, width) => sum + width, 0);
+
+    console.log(`Birleştirilmiş görüntü boyutu: ${totalWidth}x${targetHeight}`);
+    console.log(`Görsel genişlikleri:`, widths);
+
+    // Tüm görüntüleri yeniden boyutlandır
+    const resizedBuffers = await Promise.all(
+      buffers.map((buffer, i) =>
+        sharp(buffer)
+          .resize(widths[i], targetHeight, {
+            fit: "cover",
+            position: "center",
+          })
+          .toBuffer()
+      )
+    );
+
+    // Composite işlemi için pozisyonları hesapla
+    const composites = [];
+    let currentLeft = 0;
+
+    resizedBuffers.forEach((buffer, i) => {
+      composites.push({
+        input: buffer,
+        left: currentLeft,
+        top: 0,
+      });
+      currentLeft += widths[i];
+    });
+
+    // Görüntüleri yan yana birleştir
+    const combinedBuffer = await sharp({
+      create: {
+        width: totalWidth,
+        height: targetHeight,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 },
+      },
+    })
+      .composite(composites)
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    // Birleştirilmiş görüntüyü geçici dosyaya kaydet
+    const fileName = `combined_${imageUrls.length}images_${uuidv4()}.jpg`;
+    const filePath = path.join(tempDir, fileName);
+
+    await fs.promises.writeFile(filePath, combinedBuffer);
+
+    // Supabase'e yükle
+    const remotePath = `combined/${fileName}`;
+    const { data, error } = await supabase.storage
+      .from("reference")
+      .upload(remotePath, combinedBuffer, {
+        contentType: "image/jpeg",
+        upsert: true,
+      });
+
+    if (error) {
+      console.error("Birleştirilmiş görüntü yükleme hatası:", error);
+      throw error;
+    }
+
+    // Public URL al
+    const { data: publicUrlData } = supabase.storage
+      .from("reference")
+      .getPublicUrl(remotePath);
+
+    // Geçici dosyayı sil
+    fs.promises
+      .unlink(filePath)
+      .catch((err) => console.warn("Geçici dosya silinemedi:", err));
+
+    console.log(
+      `${imageUrls.length} görüntü başarıyla birleştirildi:`,
+      publicUrlData.publicUrl
+    );
+    return publicUrlData.publicUrl;
+  } catch (error) {
+    console.error("Çoklu görüntü birleştirme hatası:", error);
+    throw error;
+  }
+}
+
+// Sadece canvas üzerine model body + ürünleri yerleştiren fonksiyon (9:16 format)
+async function createProductCanvas(canvasItems) {
+  try {
+    console.log(`${canvasItems.length} öğeyi 9:16 canvas'ta birleştiriliyor`);
+    console.log("Canvas öğeleri:", canvasItems);
+
+    // Canvas öğelerini indir
+    const canvasItemBuffers = await Promise.all(
+      canvasItems.map((url) => got(url).buffer())
+    );
+
+    // 9:16 Canvas boyutları (standart boyut)
+    const canvasWidth = 1080;
+    const canvasHeight = 1920; // 9:16 ratio
+
+    console.log(`Canvas boyutu: ${canvasWidth}x${canvasHeight}`);
+
+    // Ana canvas'ı oluştur (beyaz background)
+    let mainImageWithLabels = await sharp({
+      create: {
+        width: canvasWidth,
+        height: canvasHeight,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 }, // Beyaz background
+      },
+    });
+
+    // Temiz canvas (etiket olmayan) oluştur
+    let mainImageClean = await sharp({
+      create: {
+        width: canvasWidth,
+        height: canvasHeight,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 }, // Beyaz background
+      },
+    });
+
+    // Canvas öğelerini yerleştir
+    if (canvasItemBuffers.length > 0) {
+      // Grid hesaplaması - ama çok daha büyük resimler
+      const padding = 30; // Az padding
+      const availableWidth = canvasWidth - padding * 2;
+      const availableHeight = canvasHeight - padding * 2;
+
+      // Grid boyutlarını belirle (öğe sayısına göre)
+      let cols, rows;
+      if (canvasItemBuffers.length === 1) {
+        cols = 1;
+        rows = 1;
+      } else if (canvasItemBuffers.length === 2) {
+        cols = 1;
+        rows = 2;
+      } else if (canvasItemBuffers.length <= 4) {
+        cols = 2;
+        rows = 2;
+      } else if (canvasItemBuffers.length <= 6) {
+        cols = 2;
+        rows = 3;
+      } else if (canvasItemBuffers.length <= 9) {
+        cols = 3;
+        rows = 3;
+      } else {
+        cols = 3;
+        rows = 4; // Max 12 öğe
+      }
+
+      // Her öğe için slot boyutu
+      const slotWidth = Math.floor(availableWidth / cols);
+      const slotHeight = Math.floor(availableHeight / rows);
+
+      // Öğe boyutu (slot'un %95'i - çok büyük!)
+      const itemSize = Math.min(
+        Math.floor(slotWidth * 0.95),
+        Math.floor(slotHeight * 0.95)
+      );
+
+      console.log(
+        `Grid: ${cols}x${rows}, Slot: ${slotWidth}x${slotHeight}, BÜYÜK öğe boyutu: ${itemSize}`
+      );
+
+      // Öğeleri boyutlandır ve yerleştir
+      const itemComposites = [];
+      const itemCompositesWithLabels = [];
+
+      for (
+        let i = 0;
+        i < Math.min(canvasItemBuffers.length, cols * rows);
+        i++
+      ) {
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+
+        // Öğeyi boyutlandır (orijinal oran korunacak, kırpma yok)
+        const resizedItemBuffer = await sharp(canvasItemBuffers[i])
+          .resize(itemSize, itemSize, {
+            fit: "inside", // Kırpma yapma, orijinal oranı koru
+            background: { r: 255, g: 255, b: 255 }, // Beyaz background boş alanlara
+          })
+          .toBuffer();
+
+        // Pozisyonu hesapla (ortala)
+        const x =
+          padding + col * slotWidth + Math.floor((slotWidth - itemSize) / 2);
+        const y =
+          padding + row * slotHeight + Math.floor((slotHeight - itemSize) / 2);
+
+        // Temiz canvas için resmi ekle (etiket yok)
+        itemComposites.push({
+          input: resizedItemBuffer,
+          left: x,
+          top: y,
+        });
+
+        // Etiketli canvas için resmi ekle
+        itemCompositesWithLabels.push({
+          input: resizedItemBuffer,
+          left: x,
+          top: y,
+        });
+
+        // Her resmin altına etiket ekle (sadece etiketli canvas için)
+        let labelText = "";
+        if (i === 0) {
+          labelText = "MAIN CHARACTER"; // Ana karakter
+        } else {
+          labelText = "ITEM"; // Diğer her şey sadece "ITEM"
+        }
+
+        // Etiket için SVG oluştur
+        const labelSvg = `
+          <svg width="${slotWidth}" height="40">
+            <rect width="100%" height="100%" fill="rgba(0,0,0,0.7)" rx="5"/>
+            <text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" 
+                  fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">
+              ${labelText}
+            </text>
+          </svg>
+        `;
+
+        // Etiket pozisyonu (resmin altında)
+        const labelX = padding + col * slotWidth;
+        const labelY = y + itemSize + 5; // Resmin 5px altında
+
+        // Etiket composite'ini ekle (sadece etiketli canvas için)
+        itemCompositesWithLabels.push({
+          input: Buffer.from(labelSvg),
+          left: labelX,
+          top: labelY,
+        });
+
+        console.log(
+          `BÜYÜK Öğe ${
+            i + 1
+          } (${labelText}): pozisyon (${x}, ${y}), boyut: ${itemSize}x${itemSize}`
+        );
+      }
+
+      // Temiz canvas oluştur (etiket yok)
+      if (itemComposites.length > 0) {
+        mainImageClean = mainImageClean.composite(itemComposites);
+      }
+
+      // Etiketli canvas oluştur
+      if (itemCompositesWithLabels.length > 0) {
+        mainImageWithLabels = mainImageWithLabels.composite(
+          itemCompositesWithLabels
+        );
+      }
+    }
+
+    // İki canvas buffer'ı oluştur
+    const cleanCanvasBuffer = await mainImageClean
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    const labeledCanvasBuffer = await mainImageWithLabels
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    // Her iki canvas'ı da Supabase'e yükle
+    const cleanFileName = `canvas_clean_${
+      canvasItems.length
+    }items_${uuidv4()}.jpg`;
+    const labeledFileName = `canvas_labeled_${
+      canvasItems.length
+    }items_${uuidv4()}.jpg`;
+
+    const cleanFilePath = path.join(tempDir, cleanFileName);
+    const labeledFilePath = path.join(tempDir, labeledFileName);
+
+    await fs.promises.writeFile(cleanFilePath, cleanCanvasBuffer);
+    await fs.promises.writeFile(labeledFilePath, labeledCanvasBuffer);
+
+    // Temiz canvas'ı Supabase'e yükle
+    const cleanRemotePath = `combined/${cleanFileName}`;
+    const { data: cleanData, error: cleanError } = await supabase.storage
+      .from("reference")
+      .upload(cleanRemotePath, cleanCanvasBuffer, {
+        contentType: "image/jpeg",
+        upsert: true,
+      });
+
+    if (cleanError) {
+      console.error("Temiz canvas yükleme hatası:", cleanError);
+      throw cleanError;
+    }
+
+    // Etiketli canvas'ı Supabase'e yükle
+    const labeledRemotePath = `combined/${labeledFileName}`;
+    const { data: labeledData, error: labeledError } = await supabase.storage
+      .from("reference")
+      .upload(labeledRemotePath, labeledCanvasBuffer, {
+        contentType: "image/jpeg",
+        upsert: true,
+      });
+
+    if (labeledError) {
+      console.error("Etiketli canvas yükleme hatası:", labeledError);
+      throw labeledError;
+    }
+
+    // Public URL'leri al
+    const { data: cleanPublicUrlData } = supabase.storage
+      .from("reference")
+      .getPublicUrl(cleanRemotePath);
+
+    const { data: labeledPublicUrlData } = supabase.storage
+      .from("reference")
+      .getPublicUrl(labeledRemotePath);
+
+    // Geçici dosyaları sil
+    fs.promises
+      .unlink(cleanFilePath)
+      .catch((err) => console.warn("Temiz canvas dosyası silinemedi:", err));
+    fs.promises
+      .unlink(labeledFilePath)
+      .catch((err) => console.warn("Etiketli canvas dosyası silinemedi:", err));
+
+    console.log("Temiz canvas oluşturuldu:", cleanPublicUrlData.publicUrl);
+    console.log("Etiketli canvas oluşturuldu:", labeledPublicUrlData.publicUrl);
+
+    return {
+      cleanCanvas: cleanPublicUrlData.publicUrl,
+      labeledCanvas: labeledPublicUrlData.publicUrl,
+    };
+  } catch (error) {
+    console.error("Canvas oluşturma hatası:", error);
+    throw error;
+  }
+}
+
 // Ana generate endpoint'i
 router.post("/generate", async (req, res) => {
   try {
     const { ratio, promptText, referenceImages, settings, userId } = req.body;
 
     if (
-      !promptText ||
       !referenceImages ||
       !Array.isArray(referenceImages) ||
-      referenceImages.length < 3
+      referenceImages.length < 2
     ) {
       return res.status(400).json({
         success: false,
         result: {
+          message: "En az 2 referenceImage (model + product) sağlanmalıdır.",
+        },
+      });
+    }
+
+    // Maksimum 5 görsel kontrolü (model face + model body + 3 ürün)
+    if (referenceImages.length > 5) {
+      return res.status(400).json({
+        success: false,
+        result: {
           message:
-            "Geçerli bir promptText ve en az 3 referenceImage (face + model + product) sağlanmalıdır.",
+            "En fazla 5 görsel seçebilirsiniz (model fotoğrafları + maksimum 3 ürün görseli).",
         },
       });
     }
 
     console.log("🎛️ [BACKEND] Gelen settings parametresi:", settings);
     console.log("📝 [BACKEND] Gelen promptText:", promptText);
+    console.log("🖼️ [BACKEND] Gelen referenceImages:", referenceImages);
 
-    // İlk üç görseli al (face + model + product)
-    const faceImage = referenceImages.find((img) => img.tag === "image_1");
-    const modelImage = referenceImages.find((img) => img.tag === "image_2");
-    const productImage = referenceImages.find((img) => img.tag === "image_3");
+    // Index-based sistem: [model_face, model_body, ...products]
+    // İlk görsel: model face (sol tarafta gösterilecek)
+    // İkinci görsel: model body (canvas'ta gösterilecek)
+    const faceImageUrl = referenceImages[0];
+    const modelBodyImageUrl = referenceImages[1];
 
-    if (!faceImage || !modelImage || !productImage) {
+    // Geri kalan tüm görseller: products
+    const productImageUrls = referenceImages.slice(2);
+
+    // En az model face + body olmalı
+    if (referenceImages.length < 2) {
       return res.status(400).json({
         success: false,
         result: {
-          message:
-            "Face görseli (image_1), model görseli (image_2) ve ürün görseli (image_3) gereklidir.",
+          message: "En az model face ve body fotoğrafı gereklidir.",
         },
       });
     }
 
-    console.log("Face görseli:", faceImage.uri);
-    console.log("Model görseli:", modelImage.uri);
-    console.log("Ürün görseli:", productImage.uri);
+    console.log("😊 Face görseli (canvas'ta):", faceImageUrl);
+    console.log("👤 Model body görseli (face-swap için):", modelBodyImageUrl);
+    console.log("👕 Ürün görselleri:", productImageUrls);
 
-    // 3 görseli birleştir (Gemini analizi için)
-    const combinedImageUrlForGemini = await combineImagesHorizontally(
-      faceImage.uri,
-      modelImage.uri,
-      productImage.uri
-    );
-
-    // Sadece model + product birleştir (Flux API için)
-    const combinedImageUrlForFlux = await combineModelAndProduct(
-      modelImage.uri,
-      productImage.uri
+    // Canvas sistemi: Face + products hepsi 9:16 canvas'ta grid şeklinde
+    // Model body fotoğrafı sadece face-swap için kullanılıyor
+    const canvasResult = await createProductCanvas(
+      [faceImageUrl, ...productImageUrls] // Face + products birlikte canvas'ta
     );
 
-    console.log(
-      "Gemini için birleştirilmiş görsel URL'si:",
-      combinedImageUrlForGemini
-    );
-    console.log(
-      "Flux için birleştirilmiş görsel URL'si:",
-      combinedImageUrlForFlux
-    );
+    const labeledCanvasUrl = canvasResult.labeledCanvas; // Gemini için etiketli
+    const cleanCanvasUrl = canvasResult.cleanCanvas; // Replicate için temiz
+
+    console.log("Etiketli canvas URL'si (Gemini için):", labeledCanvasUrl);
+    console.log("Temiz canvas URL'si (Replicate için):", cleanCanvasUrl);
 
     // Aspect ratio'yu formatla
     const formattedRatio = formatAspectRatio(ratio || "9:16");
@@ -651,17 +983,17 @@ router.post("/generate", async (req, res) => {
       `İstenen ratio: ${ratio}, formatlanmış ratio: ${formattedRatio}`
     );
 
-    // Kullanıcının prompt'unu Gemini ile iyileştir (3 görsel birleşimini kullan)
+    // Kullanıcının prompt'unu Gemini ile iyileştir (etiketli canvas kullan)
     const enhancedPrompt = await enhancePromptWithGemini(
-      promptText,
-      combinedImageUrlForGemini,
+      promptText || "", // Empty string fallback
+      labeledCanvasUrl, // Etiketli canvas Gemini'ye gönderiliyor
       settings || {}
     );
 
     console.log("📝 [BACKEND MAIN] Original prompt:", promptText);
     console.log("✨ [BACKEND MAIN] Enhanced prompt:", enhancedPrompt);
 
-    // Replicate API'ye istek gönder - sadece model + product görseli kullan
+    // Replicate API'ye istek gönder - Temiz canvas kullan
     const replicateResponse = await got.post(
       "https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-max/predictions",
       {
@@ -672,7 +1004,7 @@ router.post("/generate", async (req, res) => {
         json: {
           input: {
             prompt: enhancedPrompt,
-            input_image: combinedImageUrlForFlux, // Face olmadan sadece model + product
+            input_image: cleanCanvasUrl, // Temiz canvas Replicate'e gönderiliyor
             aspect_ratio: formattedRatio,
           },
         },
@@ -702,12 +1034,12 @@ router.post("/generate", async (req, res) => {
     if (finalResult.status === "succeeded" && finalResult.output) {
       console.log("Replicate API işlemi başarılı");
 
-      // Face-swap işlemi için face fotoğrafını al
-      const faceImageUrl = faceImage.uri;
+      // Face-swap işlemi için model body fotoğrafını al
+      const faceImageForSwap = modelBodyImageUrl; // Model body fotoğrafını face-swap için kullan
       const fluxOutputUrl = finalResult.output;
 
       console.log("🔄 Face-swap işlemi başlatılıyor...");
-      console.log("👤 Face image:", faceImageUrl);
+      console.log("👤 Face image:", faceImageForSwap);
       console.log("🎨 Flux output:", fluxOutputUrl);
 
       try {
@@ -723,7 +1055,7 @@ router.post("/generate", async (req, res) => {
               version:
                 "cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111",
               input: {
-                swap_image: faceImageUrl, // Face fotoğrafı
+                swap_image: faceImageForSwap, // Face fotoğrafı
                 input_image: fluxOutputUrl, // Flux-kontext sonucu
               },
             },
@@ -817,25 +1149,25 @@ router.post("/generate", async (req, res) => {
       } catch (faceSwapError) {
         console.error("Face-swap API hatası:", faceSwapError);
         // Face-swap hatası olursa orijinal flux sonucunu döndür
-      const responseData = {
-        success: true,
-        result: {
+        const responseData = {
+          success: true,
+          result: {
             imageUrl: fluxOutputUrl,
-          originalPrompt: promptText,
-          enhancedPrompt: enhancedPrompt,
+            originalPrompt: promptText,
+            enhancedPrompt: enhancedPrompt,
             replicateData: finalResult,
             faceSwapError: `Face-swap hatası: ${faceSwapError.message}, orijinal sonuç döndürülüyor`,
-        },
-      };
+          },
+        };
 
-      await saveGenerationToDatabase(
-        userId,
-        responseData,
-        promptText,
+        await saveGenerationToDatabase(
+          userId,
+          responseData,
+          promptText,
           referenceImages
-      );
+        );
 
-      return res.status(200).json(responseData);
+        return res.status(200).json(responseData);
       }
     } else {
       console.error("Replicate API başarısız:", finalResult);

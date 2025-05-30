@@ -547,4 +547,92 @@ router.delete("/delete-all-photos/:user_id", async (req, res) => {
   }
 });
 
+// Fotoğraf setini silme (user_photos tablosundan ve storage'dan)
+router.delete("/delete-photo-set", async (req, res) => {
+  try {
+    const { user_id, photo_set_id } = req.body;
+
+    if (!user_id || !photo_set_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Kullanıcı ID'si ve fotoğraf set ID'si gereklidir",
+      });
+    }
+
+    // Önce user_photos tablosundan kayıt bilgilerini al
+    const { data: photoRecord, error: fetchError } = await supabase
+      .from("user_photos")
+      .select("*")
+      .eq("id", photo_set_id)
+      .eq("user_id", user_id)
+      .single();
+
+    if (fetchError || !photoRecord) {
+      return res.status(404).json({
+        success: false,
+        message: "Fotoğraf seti bulunamadı",
+        error: fetchError?.message,
+      });
+    }
+
+    // Storage'dan fotoğrafları sil
+    const session_id = photoRecord.session_id;
+    const faceFileName = `face_${session_id}.jpg`;
+    const bodyFileName = `body_${session_id}.jpg`;
+
+    const filesToDelete = [
+      `${user_id}/${faceFileName}`,
+      `${user_id}/${bodyFileName}`,
+    ];
+
+    const { data: storageDeleteData, error: storageDeleteError } =
+      await supabase.storage.from("models").remove(filesToDelete);
+
+    if (storageDeleteError) {
+      console.error("Storage silme hatası:", storageDeleteError);
+      // Storage hatasında bile devam et, DB'den silmeyi dene
+    } else {
+      console.log(`Storage'dan silindi: ${filesToDelete.join(", ")}`);
+    }
+
+    // user_photos tablosundan kayıt sil
+    const { error: dbDeleteError } = await supabase
+      .from("user_photos")
+      .delete()
+      .eq("id", photo_set_id)
+      .eq("user_id", user_id);
+
+    if (dbDeleteError) {
+      console.error("DB silme hatası:", dbDeleteError);
+      return res.status(500).json({
+        success: false,
+        message: "Veritabanından fotoğraf seti silinemedi",
+        error: dbDeleteError.message,
+      });
+    }
+
+    console.log(
+      `Fotoğraf seti silindi: ID ${photo_set_id}, Session ${session_id}`
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Fotoğraf seti başarıyla silindi",
+      data: {
+        deleted_photo_set_id: photo_set_id,
+        deleted_session_id: session_id,
+        deleted_files: filesToDelete,
+        storage_result: storageDeleteData,
+      },
+    });
+  } catch (error) {
+    console.error("Fotoğraf seti silme genel hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Sunucu hatası",
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;
