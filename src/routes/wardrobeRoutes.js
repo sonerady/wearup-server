@@ -949,6 +949,8 @@ router.delete("/wardrobe/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
+    console.log(`Wardrobe item silme işlemi başlatılıyor. Item ID: ${id}`);
+
     // Silinecek öğeyi bul
     const { data: existingItem, error: fetchError } = await supabase
       .from("wardrobe_items")
@@ -957,6 +959,7 @@ router.delete("/wardrobe/:id", async (req, res) => {
       .single();
 
     if (fetchError) {
+      console.error("Item bulunamadı:", fetchError);
       throw fetchError;
     }
 
@@ -967,22 +970,66 @@ router.delete("/wardrobe/:id", async (req, res) => {
       });
     }
 
-    // Öğeyi veritabanından sil
+    console.log(
+      `Silinecek item bulundu: ${existingItem.item_name || existingItem.id}`
+    );
+
+    // 1. Önce item_favorites tablosundaki ilişkili kayıtları sil
+    console.log("İlişkili favorites kayıtları siliniyor...");
+    const { error: favoritesDeleteError } = await supabase
+      .from("item_favorites")
+      .delete()
+      .eq("item_id", id);
+
+    if (favoritesDeleteError) {
+      console.error("Favorites silme hatası:", favoritesDeleteError);
+      // Favorites silme hatası kritik değil, devam edebiliriz
+    } else {
+      console.log("Favorites kayıtları başarıyla silindi");
+    }
+
+    // 2. wardrobe_outfit_items tablosundaki ilişkili kayıtları sil
+    console.log("İlişkili outfit items kayıtları siliniyor...");
+    const { error: outfitItemsDeleteError } = await supabase
+      .from("wardrobe_outfit_items")
+      .delete()
+      .eq("item_id", id);
+
+    if (outfitItemsDeleteError) {
+      console.error("Outfit items silme hatası:", outfitItemsDeleteError);
+      // Bu da kritik değil, devam edebiliriz
+    } else {
+      console.log("Outfit items kayıtları başarıyla silindi");
+    }
+
+    // 3. Ana wardrobe_items tablosundan öğeyi sil
+    console.log("Ana item kaydı siliniyor...");
     const { error: deleteError } = await supabase
       .from("wardrobe_items")
       .delete()
       .eq("id", id);
 
     if (deleteError) {
+      console.error("Ana item silme hatası:", deleteError);
       throw deleteError;
     }
 
-    // Eğer öğenin bir resmi varsa, resmi de sil
-    if (existingItem.image_url) {
-      const fileName = existingItem.image_url.split("/").pop();
+    console.log("Ana item kaydı başarıyla silindi");
 
-      await supabase.storage.from("wardrobes").remove([fileName]);
+    // 4. Eğer öğenin bir resmi varsa, resmi de sil
+    if (existingItem.image_url) {
+      console.log("Item resmi siliniyor...");
+      try {
+        const fileName = existingItem.image_url.split("/").pop();
+        await supabase.storage.from("wardrobes").remove([fileName]);
+        console.log("Item resmi başarıyla silindi");
+      } catch (imageError) {
+        console.error("Resim silme hatası:", imageError);
+        // Resim silme hatası kritik değil
+      }
     }
+
+    console.log(`Item silme işlemi tamamlandı. ID: ${id}`);
 
     res.status(200).json({
       success: true,
@@ -1484,6 +1531,10 @@ router.delete("/wardrobe/outfit-item", async (req, res) => {
     // URL parametrelerini al ve doğru tipte olduklarından emin ol
     const outfitId = req.query.outfitId;
     const itemId = req.query.itemId;
+
+    console.log("===== DETAYLI OUTFIT ITEM SİLME İSTEĞİ =====");
+    console.log(`Alınan outfitId: "${outfitId}", Tipi: ${typeof outfitId}`);
+    console.log(`Alınan itemId: "${itemId}", Tipi: ${typeof itemId}`);
 
     // Gelen parametreleri detaylı logla
     console.log("===== OUTFIT ITEM SİLME İSTEĞİ =====");
