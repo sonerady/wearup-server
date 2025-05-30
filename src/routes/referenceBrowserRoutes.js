@@ -346,10 +346,12 @@ function formatAspectRatio(ratioStr) {
 async function enhancePromptWithGemini(
   originalPrompt,
   combinedImageUrl,
-  settings = {}
+  settings = {},
+  country = "us"
 ) {
   try {
     console.log("Gemini ile prompt iyileştirme başlatılıyor");
+    console.log("🌍 Kullanıcı ülkesi:", country);
 
     // Gemini modeli
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
@@ -394,9 +396,37 @@ async function enhancePromptWithGemini(
     IMPORTANT: Please incorporate the user settings above into your description when appropriate.`;
     }
 
+    // Ülkeye göre ünlü şehir ve manzara mapping'i
+    const countryLocations = {
+      tr: "Istanbul, Cappadocia, Antalya coastline, Bosphorus Bridge, or Galata Tower area",
+      us: "New York City, Los Angeles, Miami Beach, San Francisco Golden Gate, or Chicago downtown",
+      gb: "London Big Ben area, Tower Bridge, or British countryside",
+      fr: "Paris Eiffel Tower area, Champs-Élysées, or French Riviera",
+      de: "Berlin Brandenburg Gate area, Munich, or Neuschwanstein Castle surroundings",
+      it: "Rome Colosseum area, Venice canals, or Tuscany countryside",
+      es: "Madrid, Barcelona Park Güell, or Spanish coastal areas",
+      jp: "Tokyo Shibuya, Mount Fuji area, or traditional Japanese gardens",
+      kr: "Seoul Gangnam district, Busan coastal areas, or traditional Korean palace grounds",
+      cn: "Shanghai Bund, Beijing Forbidden City area, or Great Wall surroundings",
+      au: "Sydney Opera House area, Melbourne, or Australian coastal regions",
+      ca: "Toronto CN Tower area, Vancouver mountains, or Niagara Falls surroundings",
+      br: "Rio de Janeiro beaches, São Paulo, or Brazilian tropical landscapes",
+      mx: "Mexico City, Cancun beaches, or ancient Mayan site surroundings",
+      in: "Mumbai, Delhi Red Fort area, or Taj Mahal surroundings",
+      ae: "Dubai Burj Khalifa area, Abu Dhabi, or luxurious Middle Eastern settings",
+      sa: "Riyadh modern districts, Jeddah coastal areas, or Arabian desert landscapes",
+      eg: "Cairo Pyramids area, Alexandria, or Nile River surroundings",
+    };
+
+    const defaultLocation =
+      countryLocations[country.toLowerCase()] || countryLocations["us"];
+
     // Gemini'ye gönderilecek metin
     let promptForGemini = `
     The following is an original prompt from a user: "${originalPrompt}"
+    
+    User's country: ${country.toUpperCase()}
+    Default famous locations for this country: ${defaultLocation}
     
     ${settingsPromptSection}
     
@@ -422,6 +452,14 @@ async function enhancePromptWithGemini(
        - Overall physique and body structure
        - How the clothing should fit this specific body type
     5. Create a seamless virtual try-on where the model from the left is wearing the products from the right
+    
+    LOCATION AND BACKGROUND REQUIREMENTS:
+    6. MANDATORY BACKGROUND: Always include a beautiful background setting from ${country.toUpperCase()}
+    7. DEFAULT LOCATIONS: Use one of these famous locations as background: ${defaultLocation}
+    8. If no specific location is mentioned in the original prompt, automatically set the scene in one of these iconic locations
+    9. Make the background complement the fashion photography - should be aesthetic and not distracting from the clothing
+    10. The background should feel natural and authentic to ${country.toUpperCase()} culture and landmarks
+    11. IMPORTANT: Even if the original prompt doesn't mention location, ALWAYS add a beautiful ${country.toUpperCase()} landmark or cityscape as background
     
     CRITICAL CONTENT MODERATION GUIDELINES - AVOID THESE:
     1. DO NOT mention age descriptors (young, old, teen, etc.)
@@ -451,6 +489,8 @@ async function enhancePromptWithGemini(
     5. Include details about the setting, pose, and overall aesthetic
     6. VERY IMPORTANT: Describe the products from the right side in extensive detail as if they are being worn by the combined person (face + body)
     7. CRITICAL: Include how the clothing fits and looks on this specific body type and height (using professional language)
+    8. MANDATORY: Always include a beautiful background from ${country.toUpperCase()} - use one of these locations: ${defaultLocation}
+    9. Make the location feel natural and complement the fashion style
     
     STRICT LANGUAGE REQUIREMENTS: 
     - The final prompt must be 100% ENGLISH ONLY - ZERO foreign words allowed
@@ -475,8 +515,10 @@ async function enhancePromptWithGemini(
     13. CRITICAL: Use only content-moderation-safe language and terminology
     14. AVOID any terms that could be flagged as sensitive or inappropriate
     15. Focus on professional fashion description, not physical attractiveness
+    16. ALWAYS include a stunning ${country.toUpperCase()} location as background (${defaultLocation})
+    17. Make the background setting feel authentic and complement the fashion style
     
-    Your output should ONLY be the virtual try-on prompt in PURE ENGLISH that describes the complete fashion look with extensive product details, body type analysis, and physical characteristics using SAFE, PROFESSIONAL terminology${
+    Your output should ONLY be the virtual try-on prompt in PURE ENGLISH that describes the complete fashion look with extensive product details, body type analysis, physical characteristics using SAFE, PROFESSIONAL terminology, and a beautiful ${country.toUpperCase()} background setting${
       hasValidSettings
         ? " and incorporates relevant user settings (converted to natural English descriptions)"
         : ""
@@ -747,7 +789,8 @@ async function performFaceSwapWithRetry(
 // Ana generate endpoint'i
 router.post("/generate", async (req, res) => {
   try {
-    const { ratio, promptText, referenceImages, settings, userId } = req.body;
+    const { ratio, promptText, referenceImages, settings, userId, country } =
+      req.body;
 
     if (
       !promptText ||
@@ -766,6 +809,11 @@ router.post("/generate", async (req, res) => {
 
     console.log("🎛️ [BACKEND] Gelen settings parametresi:", settings);
     console.log("📝 [BACKEND] Gelen promptText:", promptText);
+    console.log("🌍 [BACKEND] Gelen country:", country);
+
+    // Country bilgisini al - eğer gönderilmemişse default "us" kullan
+    const userCountry = country || "us";
+    console.log("🌍 [BACKEND] Kullanılacak country:", userCountry);
 
     // İlk üç görseli al (face + model + product)
     const faceImage = referenceImages.find((img) => img.tag === "image_1");
@@ -814,15 +862,17 @@ router.post("/generate", async (req, res) => {
       `İstenen ratio: ${ratio}, formatlanmış ratio: ${formattedRatio}`
     );
 
-    // Kullanıcının prompt'unu Gemini ile iyileştir (3 görsel birleşimini kullan)
+    // Kullanıcının prompt'unu Gemini ile iyileştir (3 görsel birleşimini kullan + country bilgisi)
     const enhancedPrompt = await enhancePromptWithGemini(
       promptText,
       combinedImageUrlForGemini,
-      settings || {}
+      settings || {},
+      userCountry
     );
 
     console.log("📝 [BACKEND MAIN] Original prompt:", promptText);
     console.log("✨ [BACKEND MAIN] Enhanced prompt:", enhancedPrompt);
+    console.log("🌍 [BACKEND MAIN] Country used:", userCountry);
 
     // Replicate API'ye istek gönder - sadece model + product görseli kullan
     const replicateResponse = await got.post(
