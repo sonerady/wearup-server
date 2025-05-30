@@ -576,6 +576,141 @@ async function pollReplicateResult(predictionId, maxAttempts = 60) {
   throw new Error("Replicate işlemi zaman aşımına uğradı");
 }
 
+// Face-swap işlemini retry mekanizması ile yapan fonksiyon
+async function performFaceSwapWithRetry(
+  faceImageUrl,
+  fluxOutputUrl,
+  maxRetries = 3
+) {
+  console.log(`🔄 Face-swap işlemi başlatılıyor (max ${maxRetries} deneme)...`);
+  console.log("👤 Face image:", faceImageUrl);
+  console.log("🎨 Flux output:", fluxOutputUrl);
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🔄 Face-swap deneme ${attempt}/${maxRetries}...`);
+
+      // Face-swap API'sine istek gönder
+      const faceSwapResponse = await got.post(
+        "https://api.replicate.com/v1/predictions",
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
+            "Content-Type": "application/json",
+          },
+          json: {
+            version:
+              "cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111",
+            input: {
+              swap_image: faceImageUrl, // Face fotoğrafı
+              input_image: fluxOutputUrl, // Flux-kontext sonucu
+            },
+          },
+          responseType: "json",
+        }
+      );
+
+      const faceSwapInitial = faceSwapResponse.body;
+      console.log(
+        `Face-swap API başlangıç yanıtı (deneme ${attempt}):`,
+        faceSwapInitial
+      );
+
+      if (!faceSwapInitial.id) {
+        console.error(
+          `Face-swap prediction ID alınamadı (deneme ${attempt}):`,
+          faceSwapInitial
+        );
+
+        if (attempt === maxRetries) {
+          throw new Error("Face-swap başlatılamadı - tüm denemeler tükendi");
+        }
+
+        console.log(
+          `⏳ 3 saniye bekleyip tekrar deneniyor (deneme ${attempt + 1})...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        continue;
+      }
+
+      // Face-swap prediction durumunu polling ile takip et
+      console.log(
+        `🔄 Face-swap polling başlatılıyor (deneme ${attempt}): ${faceSwapInitial.id}`
+      );
+      const faceSwapResult = await pollReplicateResult(faceSwapInitial.id);
+
+      console.log(
+        `Face-swap final result (deneme ${attempt}):`,
+        faceSwapResult
+      );
+
+      if (faceSwapResult.status === "succeeded" && faceSwapResult.output) {
+        console.log(`✅ Face-swap API işlemi başarılı (deneme ${attempt})`);
+        return {
+          success: true,
+          result: faceSwapResult,
+        };
+      } else {
+        console.error(
+          `Face-swap API başarısız (deneme ${attempt}):`,
+          faceSwapResult
+        );
+
+        if (attempt === maxRetries) {
+          throw new Error(
+            faceSwapResult.error ||
+              "Face-swap işlemi başarısız - tüm denemeler tükendi"
+          );
+        }
+
+        console.log(
+          `⏳ 3 saniye bekleyip tekrar deneniyor (deneme ${attempt + 1})...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        continue;
+      }
+    } catch (error) {
+      console.error(`❌ Face-swap deneme ${attempt} hatası:`, error.message);
+
+      // Ağ bağlantısı hatalarını kontrol et
+      const isNetworkError =
+        error.message.includes("Network is unreachable") ||
+        error.message.includes("HTTPSConnectionPool") ||
+        error.message.includes("Max retries exceeded") ||
+        error.message.includes("Connection") ||
+        error.message.includes("ECONNRESET") ||
+        error.message.includes("ENOTFOUND") ||
+        error.message.includes("ETIMEDOUT");
+
+      if (isNetworkError && attempt < maxRetries) {
+        console.log(
+          `🔄 Ağ hatası tespit edildi, ${3} saniye bekleyip tekrar deneniyor (deneme ${
+            attempt + 1
+          })...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        continue;
+      }
+
+      // Son deneme veya ağ hatası değilse hata fırlat
+      if (attempt === maxRetries) {
+        console.error(
+          `❌ Face-swap tüm denemeler başarısız oldu: ${error.message}`
+        );
+        throw error;
+      }
+
+      // Diğer hatalar için de tekrar dene
+      console.log(
+        `⏳ 3 saniye bekleyip tekrar deneniyor (deneme ${attempt + 1})...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+  }
+
+  throw new Error("Face-swap işlemi başarısız - tüm denemeler tükendi");
+}
+
 // Çoklu görseli yan yana birleştiren fonksiyon (dinamik sayıda)
 async function combineMultipleImages(imageUrls) {
   try {
@@ -1071,72 +1206,24 @@ router.post("/generate", async (req, res) => {
       console.log("🎨 Flux output:", fluxOutputUrl);
 
       try {
-        // Face-swap API'sine istek gönder
-        const faceSwapResponse = await got.post(
-          "https://api.replicate.com/v1/predictions",
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
-              "Content-Type": "application/json",
-            },
-            json: {
-              version:
-                "cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111",
-              input: {
-                swap_image: faceImageForSwap, // Face fotoğrafı
-                input_image: fluxOutputUrl, // Flux-kontext sonucu
-              },
-            },
-            responseType: "json",
-          }
+        // Face-swap işlemi için retry mekanizması kullan
+        const faceSwapResult = await performFaceSwapWithRetry(
+          faceImageForSwap,
+          fluxOutputUrl
         );
 
-        const faceSwapInitial = faceSwapResponse.body;
-        console.log("Face-swap API başlangıç yanıtı:", faceSwapInitial);
-
-        if (!faceSwapInitial.id) {
-          console.error("Face-swap prediction ID alınamadı:", faceSwapInitial);
-          // Face-swap başarısız olursa orijinal flux sonucunu döndür
-          const responseData = {
-            success: true,
-            result: {
-              imageUrl: fluxOutputUrl,
-              originalPrompt: promptText,
-              enhancedPrompt: enhancedPrompt,
-              replicateData: finalResult,
-              faceSwapError:
-                "Face-swap başlatılamadı, orijinal sonuç döndürülüyor",
-            },
-          };
-
-          await saveGenerationToDatabase(
-            userId,
-            responseData,
-            promptText,
-            referenceImages
-          );
-
-          return res.status(200).json(responseData);
-        }
-
-        // Face-swap prediction durumunu polling ile takip et
-        console.log(`🔄 Face-swap polling başlatılıyor: ${faceSwapInitial.id}`);
-        const faceSwapResult = await pollReplicateResult(faceSwapInitial.id);
-
-        console.log("Face-swap final result:", faceSwapResult);
-
-        if (faceSwapResult.status === "succeeded" && faceSwapResult.output) {
+        if (faceSwapResult.success) {
           console.log("✅ Face-swap API işlemi başarılı");
 
           // Face-swap sonucunu client'e gönder
           const responseData = {
             success: true,
             result: {
-              imageUrl: faceSwapResult.output, // Face-swap sonucu
+              imageUrl: faceSwapResult.result.output, // Face-swap sonucu
               originalPrompt: promptText,
               enhancedPrompt: enhancedPrompt,
               replicateData: finalResult,
-              faceSwapData: faceSwapResult,
+              faceSwapData: faceSwapResult.result,
               originalFluxOutput: fluxOutputUrl, // Orijinal flux sonucunu da sakla
             },
           };
@@ -1150,7 +1237,7 @@ router.post("/generate", async (req, res) => {
 
           return res.status(200).json(responseData);
         } else {
-          console.error("Face-swap API başarısız:", faceSwapResult);
+          console.error("Face-swap API başarısız:", faceSwapResult.result);
           // Face-swap başarısız olursa orijinal flux sonucunu döndür
           const responseData = {
             success: true,
@@ -1160,7 +1247,7 @@ router.post("/generate", async (req, res) => {
               enhancedPrompt: enhancedPrompt,
               replicateData: finalResult,
               faceSwapError:
-                faceSwapResult.error ||
+                faceSwapResult.result.error ||
                 "Face-swap işlemi başarısız, orijinal sonuç döndürülüyor",
             },
           };
@@ -1176,6 +1263,27 @@ router.post("/generate", async (req, res) => {
         }
       } catch (faceSwapError) {
         console.error("Face-swap API hatası:", faceSwapError);
+
+        // Ağ bağlantısı hatalarını kontrol et
+        const isNetworkError =
+          faceSwapError.message.includes("Network is unreachable") ||
+          faceSwapError.message.includes("HTTPSConnectionPool") ||
+          faceSwapError.message.includes("Max retries exceeded") ||
+          faceSwapError.message.includes("Connection") ||
+          faceSwapError.message.includes("ECONNRESET") ||
+          faceSwapError.message.includes("ENOTFOUND") ||
+          faceSwapError.message.includes("ETIMEDOUT");
+
+        let errorMessage = `Face-swap hatası: ${faceSwapError.message}`;
+
+        if (isNetworkError) {
+          errorMessage =
+            "Face-swap işlemi ağ bağlantısı sorunu nedeniyle 3 kez denendi ancak başarısız oldu. Orijinal sonuç döndürülüyor.";
+        } else if (faceSwapError.message.includes("tüm denemeler tükendi")) {
+          errorMessage =
+            "Face-swap işlemi 3 kez denendi ancak başarısız oldu. Orijinal sonuç döndürülüyor.";
+        }
+
         // Face-swap hatası olursa orijinal flux sonucunu döndür
         const responseData = {
           success: true,
@@ -1184,7 +1292,7 @@ router.post("/generate", async (req, res) => {
             originalPrompt: promptText,
             enhancedPrompt: enhancedPrompt,
             replicateData: finalResult,
-            faceSwapError: `Face-swap hatası: ${faceSwapError.message}, orijinal sonuç döndürülüyor`,
+            faceSwapError: errorMessage,
           },
         };
 
