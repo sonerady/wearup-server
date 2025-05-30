@@ -346,12 +346,10 @@ function formatAspectRatio(ratioStr) {
 async function enhancePromptWithGemini(
   originalPrompt,
   combinedImageUrl,
-  settings = {},
-  country = "us"
+  settings = {}
 ) {
   try {
     console.log("Gemini ile prompt iyileştirme başlatılıyor");
-    console.log("🌍 Kullanıcı ülkesi:", country);
 
     // Gemini modeli
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
@@ -363,7 +361,23 @@ async function enhancePromptWithGemini(
         ([key, value]) => value !== null && value !== undefined && value !== ""
       );
 
+    // Location related settings kontrolü
+    const hasLocationSettings =
+      settings &&
+      Object.keys(settings).some(
+        (key) =>
+          key.toLowerCase().includes("location") ||
+          key.toLowerCase().includes("background") ||
+          key.toLowerCase().includes("setting") ||
+          key.toLowerCase().includes("environment") ||
+          key.toLowerCase().includes("place")
+      );
+
     console.log("🎛️ [BACKEND GEMINI] Settings kontrolü:", hasValidSettings);
+    console.log(
+      "📍 [BACKEND GEMINI] Location settings var mı:",
+      hasLocationSettings
+    );
 
     let settingsPromptSection = "";
 
@@ -396,39 +410,44 @@ async function enhancePromptWithGemini(
     IMPORTANT: Please incorporate the user settings above into your description when appropriate.`;
     }
 
-    // Ülkeye göre ünlü şehir ve manzara mapping'i
-    const countryLocations = {
-      tr: "Istanbul, Cappadocia, Antalya coastline, Bosphorus Bridge, or Galata Tower area",
-      us: "New York City, Los Angeles, Miami Beach, San Francisco Golden Gate, or Chicago downtown",
-      gb: "London Big Ben area, Tower Bridge, or British countryside",
-      fr: "Paris Eiffel Tower area, Champs-Élysées, or French Riviera",
-      de: "Berlin Brandenburg Gate area, Munich, or Neuschwanstein Castle surroundings",
-      it: "Rome Colosseum area, Venice canals, or Tuscany countryside",
-      es: "Madrid, Barcelona Park Güell, or Spanish coastal areas",
-      jp: "Tokyo Shibuya, Mount Fuji area, or traditional Japanese gardens",
-      kr: "Seoul Gangnam district, Busan coastal areas, or traditional Korean palace grounds",
-      cn: "Shanghai Bund, Beijing Forbidden City area, or Great Wall surroundings",
-      au: "Sydney Opera House area, Melbourne, or Australian coastal regions",
-      ca: "Toronto CN Tower area, Vancouver mountains, or Niagara Falls surroundings",
-      br: "Rio de Janeiro beaches, São Paulo, or Brazilian tropical landscapes",
-      mx: "Mexico City, Cancun beaches, or ancient Mayan site surroundings",
-      in: "Mumbai, Delhi Red Fort area, or Taj Mahal surroundings",
-      ae: "Dubai Burj Khalifa area, Abu Dhabi, or luxurious Middle Eastern settings",
-      sa: "Riyadh modern districts, Jeddah coastal areas, or Arabian desert landscapes",
-      eg: "Cairo Pyramids area, Alexandria, or Nile River surroundings",
-    };
+    // Background/location prompt section - sadece location settings yoksa ekle
+    let backgroundPromptSection = "";
 
-    const defaultLocation =
-      countryLocations[country.toLowerCase()] || countryLocations["us"];
+    if (!hasLocationSettings) {
+      backgroundPromptSection = `
+    
+    CREATIVE BACKGROUND REQUIREMENTS (No location specified by user):
+    6. CREATE a beautiful, creative background that perfectly complements the clothing style and fashion aesthetic
+    7. CHOOSE between indoor or outdoor settings based on what works best with the outfit:
+       - For casual/sporty outfits: outdoor settings like parks, streets, beaches, cafes
+       - For formal/elegant outfits: indoor settings like studios, galleries, upscale interiors
+       - For trendy/fashion outfits: modern urban settings, stylish interiors, artistic spaces
+    8. FOCUS on perfect lighting that enhances both the clothing and the model:
+       - Natural daylight for outdoor scenes
+       - Professional studio lighting for indoor scenes
+       - Golden hour lighting for romantic/elegant looks
+       - Modern architectural lighting for contemporary styles
+    9. MAKE the background atmospheric and mood-appropriate:
+       - Colors should complement the clothing colors
+       - The setting should enhance the overall fashion narrative
+       - Avoid distracting elements that take focus away from the outfit
+    10. BE CREATIVE - choose unique, visually striking backgrounds that make the photo editorial-quality
+    11. ENSURE the lighting, atmosphere, and setting create a cohesive, professional fashion photography look`;
+    } else {
+      backgroundPromptSection = `
+    
+    BACKGROUND NOTE (User specified location settings):
+    6. DO NOT add additional background descriptions - user has specified location preferences in settings
+    7. Focus only on the clothing, body, and pose descriptions as per user's location settings`;
+    }
 
     // Gemini'ye gönderilecek metin
     let promptForGemini = `
     The following is an original prompt from a user: "${originalPrompt}"
     
-    User's country: ${country.toUpperCase()}
-    Default famous locations for this country: ${defaultLocation}
-    
     ${settingsPromptSection}
+    
+    ${backgroundPromptSection}
     
     This is for a virtual try-on application. The combined image shows two parts:
     - LEFT: Full body model photo showing pose and body structure
@@ -452,14 +471,6 @@ async function enhancePromptWithGemini(
        - Overall physique and body structure
        - How the clothing should fit this specific body type
     5. Create a seamless virtual try-on where the model from the left is wearing the products from the right
-    
-    LOCATION AND BACKGROUND REQUIREMENTS:
-    6. MANDATORY BACKGROUND: Always include a beautiful background setting from ${country.toUpperCase()}
-    7. DEFAULT LOCATIONS: Use one of these famous locations as background: ${defaultLocation}
-    8. If no specific location is mentioned in the original prompt, automatically set the scene in one of these iconic locations
-    9. Make the background complement the fashion photography - should be aesthetic and not distracting from the clothing
-    10. The background should feel natural and authentic to ${country.toUpperCase()} culture and landmarks
-    11. IMPORTANT: Even if the original prompt doesn't mention location, ALWAYS add a beautiful ${country.toUpperCase()} landmark or cityscape as background
     
     CRITICAL CONTENT MODERATION GUIDELINES - AVOID THESE:
     1. DO NOT mention age descriptors (young, old, teen, etc.)
@@ -489,13 +500,20 @@ async function enhancePromptWithGemini(
     5. Include details about the setting, pose, and overall aesthetic
     6. VERY IMPORTANT: Describe the products from the right side in extensive detail as if they are being worn by the combined person (face + body)
     7. CRITICAL: Include how the clothing fits and looks on this specific body type and height (using professional language)
-    8. MANDATORY: Always include a beautiful background from ${country.toUpperCase()} - use one of these locations: ${defaultLocation}
-    9. Make the location feel natural and complement the fashion style
+    ${
+      !hasLocationSettings
+        ? "8. MANDATORY: Create a beautiful, creative background that enhances the fashion photography as described above"
+        : "8. Focus on clothing and body description only - respect user's location settings"
+    }
+    ${
+      !hasLocationSettings
+        ? "9. Make the background and lighting feel professionally crafted and complement the fashion style"
+        : ""
+    }
     
     STRICT LANGUAGE REQUIREMENTS: 
     - The final prompt must be 100% ENGLISH ONLY - ZERO foreign words allowed
     - ALL non-English words must be translated to English
-    - Make locations sound natural, not like filenames
     - Use ONLY professional, family-friendly fashion terminology
     - AVOID any content that could trigger content moderation systems
     
@@ -505,20 +523,30 @@ async function enhancePromptWithGemini(
     3. Describe the model wearing the clothing items from the product image with EXTREME DETAIL
     4. Include ALL types of clothing and accessories visible in the product image
     5. Make it sound like a professional fashion photography description
-    6. Convert locations from filename format to natural descriptive text
-    7. ABSOLUTELY NO foreign language words - translate everything to English
-    8. Focus heavily on product details: fabric texture, color nuances, design elements, fit characteristics
-    9. Describe how the clothing items from the right side look when worn by the person (face from left + body from middle)
-    10. Create a seamless combination of the three elements: face + body + clothing
-    11. MANDATORY: Always include detailed body type analysis (height, build, proportions) in the description
-    12. Describe how the specific garments complement and fit the person's body type and height
-    13. CRITICAL: Use only content-moderation-safe language and terminology
-    14. AVOID any terms that could be flagged as sensitive or inappropriate
-    15. Focus on professional fashion description, not physical attractiveness
-    16. ALWAYS include a stunning ${country.toUpperCase()} location as background (${defaultLocation})
-    17. Make the background setting feel authentic and complement the fashion style
+    6. Focus heavily on product details: fabric texture, color nuances, design elements, fit characteristics
+    7. Describe how the clothing items from the right side look when worn by the person (face from left + body from middle)
+    8. Create a seamless combination of the three elements: face + body + clothing
+    9. MANDATORY: Always include detailed body type analysis (height, build, proportions) in the description
+    10. Describe how the specific garments complement and fit the person's body type and height
+    11. CRITICAL: Use only content-moderation-safe language and terminology
+    12. AVOID any terms that could be flagged as sensitive or inappropriate
+    13. Focus on professional fashion description, not physical attractiveness
+    ${
+      !hasLocationSettings
+        ? "14. MANDATORY: Include creative, atmospheric background and lighting that creates editorial-quality fashion photography"
+        : "14. Focus exclusively on fashion and body details as user has location preferences"
+    }
+    ${
+      !hasLocationSettings
+        ? "15. Make the overall scene feel like a professional fashion shoot with perfect ambiance"
+        : ""
+    }
     
-    Your output should ONLY be the virtual try-on prompt in PURE ENGLISH that describes the complete fashion look with extensive product details, body type analysis, physical characteristics using SAFE, PROFESSIONAL terminology, and a beautiful ${country.toUpperCase()} background setting${
+    Your output should ONLY be the virtual try-on prompt in PURE ENGLISH that describes the complete fashion look with extensive product details, body type analysis, physical characteristics using SAFE, PROFESSIONAL terminology${
+      !hasLocationSettings
+        ? ", and a beautifully crafted creative background with perfect lighting"
+        : ""
+    }${
       hasValidSettings
         ? " and incorporates relevant user settings (converted to natural English descriptions)"
         : ""
@@ -789,8 +817,7 @@ async function performFaceSwapWithRetry(
 // Ana generate endpoint'i
 router.post("/generate", async (req, res) => {
   try {
-    const { ratio, promptText, referenceImages, settings, userId, country } =
-      req.body;
+    const { ratio, promptText, referenceImages, settings, userId } = req.body;
 
     if (
       !promptText ||
@@ -809,11 +836,6 @@ router.post("/generate", async (req, res) => {
 
     console.log("🎛️ [BACKEND] Gelen settings parametresi:", settings);
     console.log("📝 [BACKEND] Gelen promptText:", promptText);
-    console.log("🌍 [BACKEND] Gelen country:", country);
-
-    // Country bilgisini al - eğer gönderilmemişse default "us" kullan
-    const userCountry = country || "us";
-    console.log("🌍 [BACKEND] Kullanılacak country:", userCountry);
 
     // İlk üç görseli al (face + model + product)
     const faceImage = referenceImages.find((img) => img.tag === "image_1");
@@ -862,17 +884,15 @@ router.post("/generate", async (req, res) => {
       `İstenen ratio: ${ratio}, formatlanmış ratio: ${formattedRatio}`
     );
 
-    // Kullanıcının prompt'unu Gemini ile iyileştir (3 görsel birleşimini kullan + country bilgisi)
+    // Kullanıcının prompt'unu Gemini ile iyileştir (3 görsel birleşimini kullan)
     const enhancedPrompt = await enhancePromptWithGemini(
       promptText,
       combinedImageUrlForGemini,
-      settings || {},
-      userCountry
+      settings || {}
     );
 
     console.log("📝 [BACKEND MAIN] Original prompt:", promptText);
     console.log("✨ [BACKEND MAIN] Enhanced prompt:", enhancedPrompt);
-    console.log("🌍 [BACKEND MAIN] Country used:", userCountry);
 
     // Replicate API'ye istek gönder - sadece model + product görseli kullan
     const replicateResponse = await got.post(

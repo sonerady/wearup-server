@@ -361,7 +361,23 @@ async function enhancePromptWithGemini(
         ([key, value]) => value !== null && value !== undefined && value !== ""
       );
 
+    // Location related settings kontrolü
+    const hasLocationSettings =
+      settings &&
+      Object.keys(settings).some(
+        (key) =>
+          key.toLowerCase().includes("location") ||
+          key.toLowerCase().includes("background") ||
+          key.toLowerCase().includes("setting") ||
+          key.toLowerCase().includes("environment") ||
+          key.toLowerCase().includes("place")
+      );
+
     console.log("🎛️ [BACKEND GEMINI] Settings kontrolü:", hasValidSettings);
+    console.log(
+      "📍 [BACKEND GEMINI] Location settings var mı:",
+      hasLocationSettings
+    );
 
     let settingsPromptSection = "";
 
@@ -394,6 +410,38 @@ async function enhancePromptWithGemini(
     IMPORTANT: Please incorporate the user settings above into your description when appropriate.`;
     }
 
+    // Background/location prompt section - sadece location settings yoksa ekle
+    let backgroundPromptSection = "";
+
+    if (!hasLocationSettings) {
+      backgroundPromptSection = `
+    
+    CREATIVE BACKGROUND REQUIREMENTS (No location specified by user):
+    - CREATE a beautiful, creative background that perfectly complements the artistic style and mood
+    - CHOOSE between indoor or outdoor settings based on what works best with the overall aesthetic:
+      * For elegant/formal styles: luxurious interiors, galleries, upscale environments
+      * For casual/natural styles: outdoor settings like gardens, streets, beaches, natural landscapes  
+      * For artistic/creative styles: studios, artistic spaces, unique architectural settings
+      * For dramatic styles: moody environments with strong visual impact
+    - FOCUS on perfect lighting that enhances the artistic vision:
+      * Natural daylight for fresh, vibrant looks
+      * Professional studio lighting for polished, editorial feels
+      * Golden hour lighting for warm, romantic atmospheres
+      * Dramatic lighting for bold, artistic statements
+    - MAKE the background atmospheric and mood-appropriate:
+      * Colors should create harmony with the overall composition
+      * The setting should enhance the artistic narrative
+      * Avoid distracting elements that compete with the main subject
+    - BE CREATIVE AND ARTISTIC - choose unique, visually striking backgrounds that elevate the image to gallery-quality
+    - ENSURE the lighting, atmosphere, and setting create a cohesive, professional artistic photography look`;
+    } else {
+      backgroundPromptSection = `
+    
+    BACKGROUND NOTE (User specified location settings):
+    - DO NOT add additional background descriptions - user has specified location preferences in settings
+    - Focus only on the artistic composition, lighting, and main subject as per user's location settings`;
+    }
+
     // Gemini'ye gönderilecek metin
     let promptForGemini = `
     The following is an original prompt from a user: "${
@@ -401,6 +449,8 @@ async function enhancePromptWithGemini(
     }"
     
     ${settingsPromptSection}
+    
+    ${backgroundPromptSection}
     
     You are looking at a combined image that shows multiple photos with LABELS underneath each photo. Your task is to create a description for ONE SINGLE ARTISTIC IMAGE featuring the MAIN CHARACTER with all other elements applied to them.
     
@@ -424,6 +474,11 @@ async function enhancePromptWithGemini(
     5. COLOR HARMONY: Describe cohesive color palettes and tones
     6. MOOD & ATMOSPHERE: Create emotional depth and artistic ambiance
     7. HIGH-END QUALITY: Think luxury fashion photography, art gallery pieces
+    ${
+      !hasLocationSettings
+        ? "8. CREATIVE BACKGROUNDS: Include beautiful, artistic backgrounds that enhance the overall composition"
+        : "8. RESPECT USER LOCATION SETTINGS: Focus on composition without adding background details"
+    }
     
     CRITICAL GUIDELINES:
     1. ONLY ONE PERSON: The main character is the ONLY human in the image
@@ -431,6 +486,11 @@ async function enhancePromptWithGemini(
     3. UNIFIED SCENE: Everything should look naturally integrated in one artistic photo
     4. NO SEPARATE PEOPLE: Don't describe multiple people - combine everything onto the main character
     5. ARTISTIC VISION: Think like a professional photographer creating a portfolio piece
+    ${
+      !hasLocationSettings
+        ? "6. ENVIRONMENTAL STORYTELLING: Use backgrounds and lighting to enhance the artistic narrative"
+        : "6. FOCUS ON SUBJECT: Concentrate on the main character and items without environmental additions"
+    }
     
     EXAMPLE APPROACH:
     If you see: [Main Character] + [ITEM: Dress] + [ITEM: Desert Scene] + [ITEM: Jewelry]
@@ -442,8 +502,17 @@ async function enhancePromptWithGemini(
     - Focus on visual harmony, artistic composition, and aesthetic appeal
     - Describe ONE PERSON with all ITEMs applied to them
     - Include professional photography terms when appropriate
+    ${
+      !hasLocationSettings
+        ? "- Include creative, atmospheric background and lighting descriptions that create gallery-quality imagery"
+        : "- Focus exclusively on the main subject and applied items as user has location preferences"
+    }
     
     Your output should ONLY be a detailed English description of ONE ARTISTIC IMAGE featuring the MAIN CHARACTER with all ITEMs (clothing, background, objects, accessories) naturally integrated with them${
+      !hasLocationSettings
+        ? ", set in a beautifully crafted creative environment with perfect artistic lighting"
+        : ""
+    }${
       hasValidSettings
         ? " while incorporating the user's selected settings"
         : ""
