@@ -25,7 +25,7 @@ const shuffleArray = (array) => {
 
 // Dosya adından başlık oluşturan yardımcı fonksiyon
 const formatTitle = (filename) => {
-  if (!filename) return "style";
+  if (!filename) return "pose";
   return filename
     .replace(/\.(png|jpg|jpeg|gif|webp)$/gi, "") // Tüm resim uzantılarını kaldır
     .replace(/[-]/g, "_") // Tire'yi alt çizgiyle değiştir
@@ -63,21 +63,21 @@ const getImagesFromBucket = async (bucketName) => {
     console.log(`Found ${imageFiles.length} image files in ${bucketName}`);
 
     // Her dosya için public URL oluştur
-    const hairStyles = imageFiles.map((file, index) => {
+    const poses = imageFiles.map((file, index) => {
       const { data } = supabase.storage
         .from(bucketName)
         .getPublicUrl(file.name);
 
       return {
-        id: `hairstyle-${file.name.replace(/\.[^/.]+$/, "")}-${index}`,
+        id: `pose-${file.name.replace(/\.[^/.]+$/, "")}-${index}`,
         title: formatTitle(file.name),
         image: optimizeImageUrl(data.publicUrl),
         fileName: file.name,
       };
     });
 
-    console.log(`Processed ${hairStyles.length} hair styles`);
-    return hairStyles;
+    console.log(`Processed ${poses.length} poses`);
+    return poses;
   } catch (error) {
     console.error(`Error processing ${bucketName}:`, error);
     return [];
@@ -100,16 +100,14 @@ const paginateData = (data, page, limit) => {
 // Test endpointi
 router.get("/test", async (req, res) => {
   try {
-    const womanHairStyles = await getImagesFromBucket(
-      "woman-hair-style-images"
-    );
-    const manHairStyles = await getImagesFromBucket("man-hair-style-images");
+    const womanPoses = await getImagesFromBucket("woman-poses");
+    const manPoses = await getImagesFromBucket("man-poses");
 
     res.json({
       success: true,
-      message: "Hair Style API çalışıyor",
-      womanCount: womanHairStyles.length,
-      manCount: manHairStyles.length,
+      message: "Pose API çalışıyor",
+      womanCount: womanPoses.length,
+      manCount: manPoses.length,
     });
   } catch (error) {
     res.status(500).json({
@@ -120,18 +118,14 @@ router.get("/test", async (req, res) => {
   }
 });
 
-// Woman hair styles endpoint
+// Woman poses endpoint
 router.get("/woman", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 80;
 
-    const hairStyles = await getImagesFromBucket("woman-hair-style-images");
-    const { paginatedItems, hasMore, total } = paginateData(
-      hairStyles,
-      page,
-      limit
-    );
+    const poses = await getImagesFromBucket("woman-poses");
+    const { paginatedItems, hasMore, total } = paginateData(poses, page, limit);
 
     res.json({
       success: true,
@@ -144,24 +138,20 @@ router.get("/woman", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Woman hair styles yüklenirken hata oluştu",
+      message: "Woman poses yüklenirken hata oluştu",
       error: error.message,
     });
   }
 });
 
-// Man hair styles endpoint
+// Man poses endpoint
 router.get("/man", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 80;
 
-    const hairStyles = await getImagesFromBucket("man-hair-style-images");
-    const { paginatedItems, hasMore, total } = paginateData(
-      hairStyles,
-      page,
-      limit
-    );
+    const poses = await getImagesFromBucket("man_poses");
+    const { paginatedItems, hasMore, total } = paginateData(poses, page, limit);
 
     res.json({
       success: true,
@@ -174,7 +164,7 @@ router.get("/man", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Man hair styles yüklenirken hata oluştu",
+      message: "Man poses yüklenirken hata oluştu",
       error: error.message,
     });
   }

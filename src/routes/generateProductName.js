@@ -9,6 +9,9 @@ const { v4: uuidv4 } = require("uuid");
 // GoogleGenerativeAI kütüphanesini içe aktaralım
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
+// Kategorileri import et
+const { CATEGORIES } = require("../../../client/constants/categories");
+
 // Gemini API anahtarını alıyoruz
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(apiKey);
@@ -17,6 +20,7 @@ const genAI = new GoogleGenerativeAI(apiKey);
  * Giyim ürünü için AI analizi ve isim oluşturma
  * @route POST /generate-product-name
  * @param {file} req.file - Analiz edilecek giyim ürününün fotoğrafı
+ * @param {string} req.body.language - Kullanıcının dil tercihi (tr, en, vb.)
  * @returns {object} 200 - Analiz sonuçları (type ve query) ve oluşturulan ürün ismi
  */
 router.post(
@@ -43,6 +47,15 @@ router.post(
         });
       }
 
+      // Dil parametresini al
+      const language = req.body.language || "en";
+      console.log("Detected language for AI prompt:", language);
+
+      // Kategorileri dinamik olarak prompt için hazırla (id: 0 hariç)
+      const categoryList = CATEGORIES.filter((cat) => cat.id !== "0") // "add_custom_category" hariç
+        .map((cat) => `         - "${cat.id}": "${cat.label}"`)
+        .join("\n");
+
       // Geçici olarak resmi kaydet
       const tempDir = path.join(__dirname, "../../../temp");
       if (!fs.existsSync(tempDir)) {
@@ -58,52 +71,26 @@ router.post(
       // Gemini modeli (Gemini 1.5 Flash kullanılıyor)
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      // Prompt hazırlama
+      // Prompt hazırlama - Gemini'ye hangi dilde yanıt vermesi gerektiğini söyle
       const prompt = `
-      Analyze the clothing item visible in this photo.
+      Analyze the clothing item visible in this photo and respond in ${language}.
       Please identify the following information:
       1. Clothing type/category - Select the most appropriate category ID from this list:
-         - "1": "Tişört" (T-shirt)
-         - "2": "Jean" (Jeans)
-         - "3": "Elbise" (Dress)
-         - "4": "Sneaker"
-         - "5": "Gömlek" (Shirt)
-         - "6": "Sweatshirt"
-         - "7": "Mont" (Coat/Jacket)
-         - "8": "Kazak" (Sweater)
-         - "9": "Şort" (Shorts)
-         - "10": "Ceket" (Jacket)
-         - "11": "Çanta" (Bag)
-         - "12": "Pantolon" (Pants/Trousers)
-         - "13": "Ayakkabı" (Shoes)
-         - "14": "Etek" (Skirt)
-         - "15": "Takı" (Jewelry)
-         - "16": "Bluz" (Blouse)
-         - "17": "Polo Tişört" (Polo Shirt)
-         - "18": "Atlet" (Tank Top/Sleeveless)
-         - "19": "Hırka" (Cardigan)
-         - "20": "Yelek" (Vest)
-         - "21": "Kapüşonlu" (Hooded)
-         - "22": "Uzun Kollu" (Long Sleeve)
-         - "23": "Crop Top"
-         - "24": "Kot Pantolon" (Jeans)
-         - "25": "Kumaş Pantolon" (Fabric Pants)
-         - "26": "Eşofman" (Sweatpants)
-         - "27": "Tayt" (Leggings)
+${categoryList}
          
-      2. A VERY BRIEF description of the item (MAXIMUM 5 WORDS), focusing on color and type (e.g., "Beyaz Spor Ayakkabı", "Mavi Kot Pantolon", "Siyah Deri Ceket").
-      3. The main color(s) of the item. Return ONLY standard CSS color names like "red", "blue", "green", "black", "white", "gray", "yellow", "orange", "purple", "pink", "brown", "navy", "teal", "olive", "maroon". If there are multiple colors, separate them with commas WITHOUT spaces (e.g., "red,blue,black").
-      4. Suitable seasons for the item (Return as a list like ["İlkbahar", "Yaz"] or ["Tüm Mevsimler"]).
-      5. Relevant tags (Return as a comma-separated string like "casual, cotton, comfortable").
-      6. The material of the item (e.g., "Cotton", "Polyester", "Wool"). Always provide a best guess, do not state "Unknown".
-      7. The style of the item (e.g., "Casual", "Formal", "Sporty", "Vintage"). Always provide a best guess, do not state "Unknown".
+      2. A VERY BRIEF description of the item (MAXIMUM 5 WORDS), focusing on color and type, in ${language}.
+      3. The main color(s) of the item in ${language}. For common colors, use appropriate translations. If there are multiple colors, separate them with commas WITHOUT spaces (e.g., "red,blue,black" for English or "kırmızı,mavi,siyah" for Turkish).
+      4. Suitable seasons for the item (Return as a list in English ONLY, use: "Spring", "Summer", "Autumn", "Winter", or "All Seasons").
+      5. Relevant tags in ${language} (Return as a comma-separated string like "casual, cotton, comfortable").
+      6. The material of the item in ${language} (e.g., "Cotton", "Polyester", "Wool"). Always provide a best guess, do not state "Unknown".
+      7. The style of the item in ${language} (e.g., "Casual", "Formal", "Sporty", "Vintage"). Always provide a best guess, do not state "Unknown".
       8. The gender category the item belongs to. ONLY return one of these exact values: "men", "women", "unisex", "kids". Do not use any other values.
       9. The brand of the item, if identifiable. If not clearly identifiable, make a best guess based on design, style, or common characteristics (e.g. "Nike", "Adidas", "Zara", "H&M"). If truly impossible to guess, return "Unknown".
 
       Respond STRICTLY in the following JSON format:
       {
         "type": "ONLY RETURN THE NUMERIC ID as a string, e.g. '1' or '12', etc.",
-        "query": "MAX 5 WORDS description",
+        "query": "MAX 5 WORDS description in ${language}",
         "color": "main color(s)",
         "seasons": ["season1", "season2"],
         "tags": "tag1, tag2, tag3",
@@ -159,8 +146,10 @@ router.post(
         analysisResult = JSON.parse(cleanJson);
 
         // Eksik alanlar için varsayılan değerler ata
-        analysisResult.type = analysisResult.type || "Giyim Ürünü";
-        analysisResult.query = analysisResult.query || "Açıklama yok";
+        analysisResult.type = analysisResult.type || "1";
+        analysisResult.query =
+          analysisResult.query ||
+          (language === "tr" ? "Açıklama yok" : "No description");
 
         // Query en fazla 5 kelime olacak şekilde kırp
         if (analysisResult.query) {
@@ -170,71 +159,68 @@ router.post(
           }
         }
 
-        analysisResult.color = analysisResult.color || "Belirlenmedi";
+        analysisResult.color =
+          analysisResult.color ||
+          (language === "tr" ? "belirlenmedi" : "undetermined");
         analysisResult.seasons = Array.isArray(analysisResult.seasons)
           ? analysisResult.seasons
           : [];
         analysisResult.tags = analysisResult.tags || "";
-        analysisResult.material = analysisResult.material || "Genel";
-        analysisResult.style = analysisResult.style || "Genel";
-        analysisResult.gender = analysisResult.gender || "Unisex";
+        analysisResult.material =
+          analysisResult.material || (language === "tr" ? "Genel" : "General");
+        analysisResult.style =
+          analysisResult.style || (language === "tr" ? "Genel" : "General");
+        analysisResult.gender = analysisResult.gender || "unisex";
         analysisResult.brand = analysisResult.brand || "Unknown";
       } catch (error) {
         console.error("JSON ayrıştırma hatası veya eksik alanlar:", error);
         console.error("Alınan Ham Yanıt:", responseText);
         // JSON ayrıştırılamadıysa veya alanlar eksikse varsayılan değerleri kullan
         analysisResult = {
-          type: "Giyim Ürünü",
-          query: "Açıklama yok",
-          color: "Belirlenmedi",
+          type: "1",
+          query: language === "tr" ? "Açıklama yok" : "No description",
+          color: language === "tr" ? "belirlenmedi" : "undetermined",
           seasons: [],
           tags: "",
-          material: "Genel",
-          style: "Genel",
-          gender: "Unisex",
+          material: language === "tr" ? "Genel" : "General",
+          style: language === "tr" ? "Genel" : "General",
+          gender: "unisex",
           brand: "Unknown",
         };
       }
 
-      // --- Mevsim ID Eşleştirmesi ve "Tüm Mevsimler" Mantığı ---
-      const SEASON_IDS = {
-        İlkbahar: "spring",
-        Yaz: "summer",
-        Sonbahar: "autumn",
-        Kış: "winter",
+      // --- Mevsim ID Eşleştirmesi ---
+      // Gemini her zaman İngilizce seasons döndürüyor
+      const SEASON_MAPPING = {
+        Spring: "spring",
+        Summer: "summer",
+        Autumn: "autumn",
+        Fall: "autumn",
+        Winter: "winter",
+        "All Seasons": "all",
       };
-      const ALL_SEASONS_IDENTIFIER = "Tüm Mevsimler";
 
       let seasonIdsForApi = [];
-      let seasonNamesForFrontend = [];
       const geminiSeasonNames = Array.isArray(analysisResult.seasons)
         ? analysisResult.seasons
-        : []; // Gemini'den gelen dizi (güvenlik kontrolü)
+        : [];
 
-      if (geminiSeasonNames.includes(ALL_SEASONS_IDENTIFIER)) {
-        // Eğer "Tüm Mevsimler" geldiyse, tüm mevsim ID'lerini ekle
-        seasonIdsForApi = Object.values(SEASON_IDS);
-        seasonNamesForFrontend = ["Tüm Mevsimler"];
-      } else {
-        // Aksi takdirde, gelen isimleri ID'lere çevir
-        seasonIdsForApi = geminiSeasonNames
-          .map((name) => SEASON_IDS[name]) // İsmi ID'ye çevir
-          .filter((id) => id); // Geçersiz isimlerden kaynaklanan null/undefined ID'leri filtrele
+      // Gelen mevsim isimlerini ID'lere çevir
+      seasonIdsForApi = geminiSeasonNames
+        .map((seasonName) => {
+          return SEASON_MAPPING[seasonName] || null;
+        })
+        .filter((id) => id); // null değerleri filtrele
 
-        // Frontend için doğrudan Türkçe mevsim isimlerini kullan
-        seasonNamesForFrontend = geminiSeasonNames.filter(
-          (name) =>
-            Object.keys(SEASON_IDS).includes(name) ||
-            name === ALL_SEASONS_IDENTIFIER
-        );
+      // Eğer "all" varsa, tüm mevsimleri ekle
+      if (seasonIdsForApi.includes("all")) {
+        seasonIdsForApi = ["spring", "summer", "autumn", "winter"];
       }
-      // ----------------------------------------------------------
 
-      // Ürün ismi olarak query alanını veya type + color kullanabiliriz.
-      // Şimdilik query'yi kullanalım. Gerekirse daha sonra değiştirilebilir.
+      // Ürün ismi olarak query alanını kullan
       const productName =
         analysisResult.query ||
-        `${analysisResult.color} ${analysisResult.type}`;
+        (language === "tr" ? "Giyim Ürünü" : "Clothing Item");
 
       // Geçici dosyayı temizle
       fs.unlinkSync(tempFilePath);
@@ -244,18 +230,19 @@ router.post(
         success: true,
         type: analysisResult.type,
         query: analysisResult.query,
-        productName, // query'yi productName olarak kullanıyoruz
+        productName,
         color: analysisResult.color,
-        seasons: seasonNamesForFrontend, // Frontend için Türkçe isimleri gönder
+        seasons: geminiSeasonNames, // Frontend için Gemini'nin döndürdüğü isimleri gönder
         seasonsIds: seasonIdsForApi, // Arka plan için ID'leri de sakla
-        tags: analysisResult.tags, // Virgülle ayrılmış string
+        tags: analysisResult.tags,
         material: analysisResult.material,
         style: analysisResult.style,
         gender: analysisResult.gender,
-        brand: analysisResult.brand, // Marka bilgisini ekle
+        brand: analysisResult.brand,
+        language: language, // Hangi dilde yanıt verildiğini de gönder
       });
     } catch (error) {
-      console.error("Ürün analizi hatası:", error); // Hata mesajı güncellendi
+      console.error("Ürün analizi hatası:", error);
 
       // Geçici dosya oluşturulduysa silmeyi dene
       if (fs.existsSync(tempFilePath)) {
@@ -269,7 +256,7 @@ router.post(
       return res.status(500).json({
         success: false,
         error: "İşlem hatası",
-        message: error.message || "Ürün analizi sırasında bir hata oluştu", // Mesaj güncellendi
+        message: error.message || "Ürün analizi sırasında bir hata oluştu",
       });
     }
   }

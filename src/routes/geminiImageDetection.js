@@ -58,8 +58,9 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
     "bytes"
   );
 
-  const country = "us";
-  const language = "en";
+  // İstemciden gelen dil ve ülke parametrelerini al
+  const country = req.body.country || "us";
+  const language = req.body.language || "en";
   console.log(`Parametreler: Ülke: ${country}, Dil: ${language}`);
 
   const imagePath = req.file.path;
@@ -89,6 +90,26 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
         model: "gemini-1.5-flash",
       });
 
+      // Dil kodlarını tam dil isimlerine çevir
+      const getLanguageName = (langCode) => {
+        const langMap = {
+          tr: "Turkish",
+          en: "English",
+          de: "German",
+          es: "Spanish",
+          fr: "French",
+          it: "Italian",
+          ja: "Japanese",
+          ko: "Korean",
+          pt: "Portuguese",
+          ru: "Russian",
+          zh: "Chinese",
+        };
+        return langMap[langCode] || "English";
+      };
+
+      const languageName = getLanguageName(language);
+
       // Prepare prompt for clothing item analysis
       const prompt = `
         Analyze this image and identify all visible clothing items and accessories worn by the person.
@@ -107,7 +128,15 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
 
         Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
         
-        IMPORTANT: Write the "type" field in the user's language (${language}), but the "query" field must ALWAYS be in English.
+        CRITICAL LANGUAGE INSTRUCTION: 
+        - Write the "type" field in ${languageName} language (language code: ${language})
+        - The "query" field must ALWAYS be in English
+        
+        For example, if the language is Turkish:
+        { "type": "Gömlek", "query": "blue striped button-up shirt male" }
+        
+        If the language is Russian:
+        { "type": "Рубашка", "query": "blue striped button-up shirt male" }
       `;
 
       console.log("Sending request to Gemini API...");
@@ -296,6 +325,26 @@ router.post("/analyze-clothing-url", async (req, res) => {
       model: "gemini-1.5-flash",
     });
 
+    // Dil kodlarını tam dil isimlerine çevir
+    const getLanguageName = (langCode) => {
+      const langMap = {
+        tr: "Turkish",
+        en: "English",
+        de: "German",
+        es: "Spanish",
+        fr: "French",
+        it: "Italian",
+        ja: "Japanese",
+        ko: "Korean",
+        pt: "Portuguese",
+        ru: "Russian",
+        zh: "Chinese",
+      };
+      return langMap[langCode] || "English";
+    };
+
+    const languageName = getLanguageName(language);
+
     // Prepare prompt for clothing item analysis
     const prompt = `
       Analyze this image and identify all visible clothing items and accessories worn by the person.
@@ -314,7 +363,15 @@ router.post("/analyze-clothing-url", async (req, res) => {
 
       Only include items that are clearly visible. Every item **must** have both a non-empty "type" (actual specific category) and a descriptive "query" including the gender. IMPORTANT: DO NOT return any item without both fields properly filled. DO NOT use parentheses around the gender in the query field.
       
-      IMPORTANT: Write the "type" field in the user's language (${language}), but the "query" field must ALWAYS be in English.
+      CRITICAL LANGUAGE INSTRUCTION: 
+      - Write the "type" field in ${languageName} language (language code: ${language})
+      - The "query" field must ALWAYS be in English
+      
+      For example, if the language is Turkish:
+      { "type": "Gömlek", "query": "blue striped button-up shirt male" }
+      
+      If the language is Russian:
+      { "type": "Рубашка", "query": "blue striped button-up shirt male" }
     `;
 
     console.log("Sending request to Gemini API...");

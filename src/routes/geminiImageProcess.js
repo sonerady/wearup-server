@@ -268,7 +268,7 @@ router.post(
 
           // Use Gemini 2.0 Flash for processing both images
           const model = genAI.getGenerativeModel({
-            model: "gemini-2.0-flash-exp",
+            model: "gemini-1.5-flash-exp",
             generationConfig: {
               responseModalities: ["Text", "Image"],
               temperature: 1,

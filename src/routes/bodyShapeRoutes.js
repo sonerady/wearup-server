@@ -25,16 +25,18 @@ const shuffleArray = (array) => {
 
 // Dosya adından başlık oluşturan yardımcı fonksiyon
 const formatTitle = (filename) => {
-  if (!filename) return "style";
+  if (!filename) return "shape";
   return filename
-    .replace(/\.(png|jpg|jpeg|gif|webp)$/gi, "") // Tüm resim uzantılarını kaldır
-    .replace(/[-]/g, "_") // Tire'yi alt çizgiyle değiştir
-    .toLowerCase() // Küçük harflere çevir
-    .replace(/\s+/g, "_"); // Boşlukları alt çizgiyle değiştir
+    .replace(/\.png|\.jpg|\.jpeg/gi, "") // Uzantıları kaldır
+    .replace(/[-_]/g, " ") // Tire ve alt çizgiyi boşlukla değiştir
+    .toLowerCase()
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1)) // İlk harfleri büyüt
+    .join(" ");
 };
 
 // Supabase bucket'tan resimleri getiren fonksiyon
-const getImagesFromBucket = async (bucketName) => {
+const getImagesFromBucket = async (bucketName, category) => {
   try {
     console.log(`Fetching images from bucket: ${bucketName}`);
 
@@ -63,21 +65,22 @@ const getImagesFromBucket = async (bucketName) => {
     console.log(`Found ${imageFiles.length} image files in ${bucketName}`);
 
     // Her dosya için public URL oluştur
-    const hairStyles = imageFiles.map((file, index) => {
+    const bodyShapes = imageFiles.map((file, index) => {
       const { data } = supabase.storage
         .from(bucketName)
         .getPublicUrl(file.name);
 
       return {
-        id: `hairstyle-${file.name.replace(/\.[^/.]+$/, "")}-${index}`,
+        id: `${category}-${file.name.replace(/\.[^/.]+$/, "")}-${index}`,
         title: formatTitle(file.name),
         image: optimizeImageUrl(data.publicUrl),
+        category: category,
         fileName: file.name,
       };
     });
 
-    console.log(`Processed ${hairStyles.length} hair styles`);
-    return hairStyles;
+    console.log(`Processed ${bodyShapes.length} ${category} body shapes`);
+    return bodyShapes;
   } catch (error) {
     console.error(`Error processing ${bucketName}:`, error);
     return [];
@@ -100,16 +103,15 @@ const paginateData = (data, page, limit) => {
 // Test endpointi
 router.get("/test", async (req, res) => {
   try {
-    const womanHairStyles = await getImagesFromBucket(
-      "woman-hair-style-images"
-    );
-    const manHairStyles = await getImagesFromBucket("man-hair-style-images");
+    const manShapes = await getImagesFromBucket("man-body-shapes", "man");
+    const womanShapes = await getImagesFromBucket("woman-body-shapes", "woman");
 
     res.json({
       success: true,
-      message: "Hair Style API çalışıyor",
-      womanCount: womanHairStyles.length,
-      manCount: manHairStyles.length,
+      message: "Body Shape API çalışıyor",
+      manCount: manShapes.length,
+      womanCount: womanShapes.length,
+      totalBodyShapes: manShapes.length + womanShapes.length,
     });
   } catch (error) {
     res.status(500).json({
@@ -120,15 +122,15 @@ router.get("/test", async (req, res) => {
   }
 });
 
-// Woman hair styles endpoint
-router.get("/woman", async (req, res) => {
+// Man body shapes endpoint
+router.get("/man", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 80;
+    const limit = parseInt(req.query.limit) || 10;
 
-    const hairStyles = await getImagesFromBucket("woman-hair-style-images");
+    const manShapes = await getImagesFromBucket("man-body-shapes", "man");
     const { paginatedItems, hasMore, total } = paginateData(
-      hairStyles,
+      manShapes,
       page,
       limit
     );
@@ -144,21 +146,21 @@ router.get("/woman", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Woman hair styles yüklenirken hata oluştu",
+      message: "Man body shapes yüklenirken hata oluştu",
       error: error.message,
     });
   }
 });
 
-// Man hair styles endpoint
-router.get("/man", async (req, res) => {
+// Woman body shapes endpoint
+router.get("/woman", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 80;
+    const limit = parseInt(req.query.limit) || 10;
 
-    const hairStyles = await getImagesFromBucket("man-hair-style-images");
+    const womanShapes = await getImagesFromBucket("woman-body-shapes", "woman");
     const { paginatedItems, hasMore, total } = paginateData(
-      hairStyles,
+      womanShapes,
       page,
       limit
     );
@@ -174,10 +176,11 @@ router.get("/man", async (req, res) => {
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Man hair styles yüklenirken hata oluştu",
+      message: "Woman body shapes yüklenirken hata oluştu",
       error: error.message,
     });
   }
 });
 
 module.exports = router;
+ 

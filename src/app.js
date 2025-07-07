@@ -36,6 +36,7 @@ const faceSwapRouter = require("./routes/faceSwap");
 const geminiImageProcessRouter = require("./routes/geminiImageProcess");
 const geminiImageDetectionRouter = require("./routes/geminiImageDetection");
 const imageClarityProcessRouter = require("./routes/imageClarityProcess");
+const purchaseRoutes = require("./routes/purchaseRoutes");
 const webScrapingRouter = require("./routes/webScraping");
 const wardrobeRoutes = require("./routes/wardrobeRoutes");
 const favoritesRoutes = require("./routes/favoritesRoutes");
@@ -51,6 +52,9 @@ const tournamentRoutes = require("./routes/tournamentRoutes");
 const generateProductNameRouter = require("./routes/generateProductName");
 const poseRoutes = require("./routes/poseRoutes");
 const referenceBrowserRoutes = require("./routes/referenceBrowserRoutes");
+const bodyShapeRoutes = require("./routes/bodyShapeRoutes");
+const editRoomRoutes = require("./routes/editRoomRoutes");
+
 // Lokasyon rotalarını import et
 const locationRoutes = require("./routes/locationRoutes");
 // Saç stili rotalarını import et
@@ -100,14 +104,6 @@ if (!fs.existsSync(outputsDir)) {
   console.log("Outputs directory ready:", outputsDir);
 }
 
-// Poz JSON dosyalarının yollarını kontrol et
-const manPosesPath = path.join(__dirname, "../lib/man_poses.json");
-const womanPosesPath = path.join(__dirname, "../lib/woman_poses.json");
-console.log("Man poses path:", manPosesPath);
-console.log("Woman poses path:", womanPosesPath);
-console.log("Man poses exists:", fs.existsSync(manPosesPath));
-console.log("Woman poses exists:", fs.existsSync(womanPosesPath));
-
 // Basit test endpointi ekle
 app.get("/test", (req, res) => {
   console.log("Test endpoint was called from:", req.ip);
@@ -154,15 +150,18 @@ app.use("/api", inspirationsRoutes);
 // Poz rotalarını ekle
 app.use("/api/poses", poseRoutes);
 // Lokasyon rotalarını ekle
-app.use("/api/locations", locationRoutes);
+app.use("/api", locationRoutes);
 // Saç stili rotalarını ekle
 app.use("/api/hairstyles", hairStyleRoutes);
 // Saç rengi rotalarını ekle
+app.use("/api/bodyshapes", bodyShapeRoutes);
+
 app.use("/api/haircolors", hairColorRoutes);
 // Referans görsel oluşturma rotalarını ekle
 app.use("/api/reference", referenceRoutes);
 app.use("/api/referenceBrowser", referenceBrowserRoutes);
 app.use("/api/reference", exploreRoutes);
+app.use("/api/editRoom", editRoomRoutes);
 
 // Mevcut route tanımlamaları
 app.use("/api", backgroundGeneratorRouter);
@@ -206,8 +205,9 @@ app.use("/api", generateProductNameRouter);
 app.use("/api/gemini-tryon", geminiTryOnProductCratorRoutes);
 
 // RevenueCat webhook route ekle
-app.use("/revenuecat", revenuecatWebhookRouter);
 
+app.use("/revenuecat", revenuecatWebhookRouter);
+app.use("/purchase", purchaseRoutes);
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server is running on port ${PORT}`);

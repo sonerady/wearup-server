@@ -1,27 +1,19 @@
 const express = require("express");
 const router = express.Router();
-const fs = require("fs");
-const path = require("path");
-
-// JSON dosyalarının yolları
-const malePosesPath = path.join(__dirname, "../../lib/man_poses.json");
-const femalePosesPath = path.join(__dirname, "../../lib/woman_poses.json");
+const supabase = require("../supabaseClient");
 
 // Resim URL'lerine boyut parametresi ekleyen yardımcı fonksiyon
 const optimizeImageUrl = (imageUrl) => {
   if (!imageUrl) return imageUrl;
-
   // Sadece supabase URL'lerini işle
   if (imageUrl.includes("supabase.co/storage")) {
-    // URL'de zaten parametre var mı kontrol et
     const hasParams = imageUrl.includes("?");
     return `${imageUrl}${hasParams ? "&" : "?"}width=512&height=512`;
   }
-
   return imageUrl;
 };
 
-// Diziyi karıştırmak için Fisher-Yates shuffle algoritması
+// Diziyi karıştıran yardımcı fonksiyon
 const shuffleArray = (array) => {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -31,107 +23,148 @@ const shuffleArray = (array) => {
   return shuffled;
 };
 
-// JSON dosyalarını oku
-let malePoses = [];
-let femalePoses = [];
+// Dosya adından başlık oluşturan yardımcı fonksiyon
+const formatTitle = (filename) => {
+  if (!filename) return "pose";
+  return filename
+    .replace(/\.(png|jpg|jpeg|gif|webp)$/gi, "") // Tüm resim uzantılarını kaldır
+    .replace(/[-]/g, "_") // Tire'yi alt çizgiyle değiştir
+    .toLowerCase() // Küçük harflere çevir
+    .replace(/\s+/g, "_"); // Boşlukları alt çizgiyle değiştir
+};
 
-try {
-  const maleData = fs.readFileSync(malePosesPath, "utf8");
-  malePoses = JSON.parse(maleData);
+// Supabase bucket'tan resimleri getiren fonksiyon
+const getImagesFromBucket = async (bucketName) => {
+  try {
+    console.log(`Fetching images from bucket: ${bucketName}`);
 
-  // URL'leri optimize et
-  malePoses = malePoses.map((pose) => ({
-    ...pose,
-    image: optimizeImageUrl(pose.image),
-  }));
+    const { data: files, error } = await supabase.storage
+      .from(bucketName)
+      .list("", {
+        limit: 1000,
+        sortBy: { column: "name", order: "asc" },
+      });
 
-  console.log(`${malePoses.length} erkek pozu yüklendi`);
-} catch (error) {
-  console.error("Man poses yüklenirken hata:", error);
-}
+    if (error) {
+      console.error(`Error fetching from ${bucketName}:`, error);
+      return [];
+    }
 
-try {
-  const femaleData = fs.readFileSync(femalePosesPath, "utf8");
-  femalePoses = JSON.parse(femaleData);
+    if (!files || files.length === 0) {
+      console.log(`No files found in bucket: ${bucketName}`);
+      return [];
+    }
 
-  // URL'leri optimize et
-  femalePoses = femalePoses.map((pose) => ({
-    ...pose,
-    image: optimizeImageUrl(pose.image),
-  }));
+    // Sadece resim dosyalarını filtrele
+    const imageFiles = files.filter((file) =>
+      file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+    );
 
-  console.log(`${femalePoses.length} kadın pozu yüklendi`);
-} catch (error) {
-  console.error("Woman poses yüklenirken hata:", error);
-}
+    console.log(`Found ${imageFiles.length} image files in ${bucketName}`);
+
+    // Her dosya için public URL oluştur
+    const poses = imageFiles.map((file, index) => {
+      const { data } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(file.name);
+
+      return {
+        id: `pose-${file.name.replace(/\.[^/.]+$/, "")}-${index}`,
+        title: formatTitle(file.name),
+        image: optimizeImageUrl(data.publicUrl),
+        fileName: file.name,
+      };
+    });
+
+    console.log(`Processed ${poses.length} poses`);
+    return poses;
+  } catch (error) {
+    console.error(`Error processing ${bucketName}:`, error);
+    return [];
+  }
+};
+
+// Verileri sayfalama fonksiyonu
+const paginateData = (data, page, limit) => {
+  const shuffledData = shuffleArray(data);
+  const startIndex = (page - 1) * limit;
+  const endIndex = page * limit;
+  const paginatedItems = shuffledData.slice(startIndex, endIndex);
+  return {
+    paginatedItems,
+    hasMore: endIndex < data.length,
+    total: data.length,
+  };
+};
 
 // Test endpointi
-router.get("/test", (req, res) => {
-  res.json({
-    success: true,
-    message: "Poz API çalışıyor",
-    malePosesCount: malePoses.length,
-    femalePosesCount: femalePoses.length,
-  });
-});
-
-// Erkek pozlarını getir
-router.get("/male", (req, res) => {
+router.get("/test", async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-
-    // Verileri karıştır
-    const shuffledPoses = shuffleArray(malePoses);
-
-    const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
-
-    const paginatedPoses = shuffledPoses.slice(startIndex, endIndex);
+    const womanPoses = await getImagesFromBucket("woman-poses");
+    const manPoses = await getImagesFromBucket("man-poses");
 
     res.json({
       success: true,
-      total: malePoses.length,
-      page: page,
-      limit: limit,
-      hasMore: endIndex < malePoses.length,
-      data: paginatedPoses,
+      message: "Pose API çalışıyor",
+      womanCount: womanPoses.length,
+      manCount: manPoses.length,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Erkek pozları yüklenirken hata oluştu",
+      message: "Test endpoint hatası",
       error: error.message,
     });
   }
 });
 
-// Kadın pozlarını getir
-router.get("/female", (req, res) => {
+// Woman poses endpoint
+router.get("/woman", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = parseInt(req.query.limit) || 80;
 
-    // Verileri karıştır
-    const shuffledPoses = shuffleArray(femalePoses);
-
-    const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
-
-    const paginatedPoses = shuffledPoses.slice(startIndex, endIndex);
+    const poses = await getImagesFromBucket("woman-poses");
+    const { paginatedItems, hasMore, total } = paginateData(poses, page, limit);
 
     res.json({
       success: true,
-      total: femalePoses.length,
-      page: page,
-      limit: limit,
-      hasMore: endIndex < femalePoses.length,
-      data: paginatedPoses,
+      total,
+      page,
+      limit,
+      hasMore,
+      data: paginatedItems,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Kadın pozları yüklenirken hata oluştu",
+      message: "Woman poses yüklenirken hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
+// Man poses endpoint
+router.get("/man", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 80;
+
+    const poses = await getImagesFromBucket("man-poses");
+    const { paginatedItems, hasMore, total } = paginateData(poses, page, limit);
+
+    res.json({
+      success: true,
+      total,
+      page,
+      limit,
+      hasMore,
+      data: paginatedItems,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Man poses yüklenirken hata oluştu",
       error: error.message,
     });
   }

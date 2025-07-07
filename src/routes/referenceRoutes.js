@@ -352,7 +352,7 @@ async function enhancePromptWithGemini(
     console.log("Gemini ile prompt iyileştirme başlatılıyor");
 
     // Gemini modeli
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // Settings'in var olup olmadığını kontrol et
     const hasValidSettings =
@@ -444,7 +444,7 @@ async function enhancePromptWithGemini(
 
     // Gemini'ye gönderilecek metin
     let promptForGemini = `
-    The following is an original prompt from a user: "${
+    Create a detailed, professional fashion photography description based on this original user input: "${
       originalPrompt || "Create an artistic image"
     }"
     
@@ -458,13 +458,42 @@ async function enhancePromptWithGemini(
     - Photo labeled "MAIN CHARACTER" = This is the ONLY PERSON in the final image
     - Photos labeled "ITEM" = These should be applied to/used by the main character (clothing, accessories, backgrounds, objects, etc.)
     
+    CRITICAL INSTRUCTION: IGNORE ALL CLOTHING that the MAIN CHARACTER is currently wearing. Do NOT describe the main character's existing clothing. Only focus on their body, pose, and physical characteristics.
+    
     MAIN TASK:
-    - Take the MAIN CHARACTER (first photo) as your only person
+    - Take the MAIN CHARACTER (first photo) as your only person (IGNORE their current clothing)
     - Apply all ITEMS to this character in appropriate ways:
-      * Clothing items should be WORN by the character
+      * Clothing items should be WORN by the character (REPLACE their existing clothing)
       * Background scenes should be the SETTING/ENVIRONMENT
       * Accessories/objects should be held, worn, or placed around the character
     - Create ONE FINAL ARTISTIC IMAGE with only ONE PERSON
+    
+    CORE REQUIREMENTS:
+    1. FOCUS ON THE PERSON: Describe the main character - their body type, height, build, posture, and pose (BUT IGNORE THEIR CURRENT CLOTHING)
+    2. CLOTHING DETAILS: Describe in EXTREME DETAIL ONLY the clothing/fashion items from the ITEM photos:
+       - Exact colors, patterns, textures, fabrics, materials
+       - Specific cuts, silhouettes, design elements
+       - Unique features, embellishments, details, finishes
+       - How each garment fits and drapes on this specific person's body
+       - Material characteristics (matte, glossy, textured, smooth, etc.)
+    3. STYLING: Show how the ITEM products look when styled on the MAIN CHARACTER
+    4. FASHION INTEGRATION: Create a seamless look where all clothing items from the ITEM photos work together harmoniously
+    
+    DETAILED PRODUCT ANALYSIS REQUIRED:
+    - Analyze EVERY visible clothing item and accessory from the ITEM photos ONLY
+    - DO NOT mention any clothing visible on the MAIN CHARACTER
+    - Describe fabric textures, weaves, finishes in detail
+    - Mention specific design elements: buttons, zippers, seams, cuts, patterns
+    - Describe how each piece fits this particular body type and height
+    - Include color descriptions with nuances and undertones
+    - Mention any logos, prints, or decorative elements (but avoid brand names)
+    - Describe the overall style aesthetic and fashion category
+    
+    BODY & STYLING INTEGRATION:
+    - How the ITEM clothing complements the person's body proportions
+    - How the fit enhances their natural silhouette
+    - How the colors work with their overall appearance
+    - How the style matches their pose and attitude
     
     ARTISTIC PHOTOGRAPHY REQUIREMENTS:
     1. ARTISTIC COMPOSITION: Create visually stunning, magazine-quality imagery
@@ -496,27 +525,41 @@ async function enhancePromptWithGemini(
     If you see: [Main Character] + [ITEM: Dress] + [ITEM: Desert Scene] + [ITEM: Jewelry]
     Create: "An artistic portrait of [describe main character] elegantly wearing [dress description] and [jewelry description] in a beautifully composed [desert scene], featuring professional lighting and sophisticated visual aesthetics"
     
-    LANGUAGE REQUIREMENTS:
-    - Output must be 100% ENGLISH ONLY
-    - Use sophisticated, artistic language
-    - Focus on visual harmony, artistic composition, and aesthetic appeal
-    - Describe ONE PERSON with all ITEMs applied to them
-    - Include professional photography terms when appropriate
-    ${
-      !hasLocationSettings
-        ? "- Include creative, atmospheric background and lighting descriptions that create gallery-quality imagery"
-        : "- Focus exclusively on the main subject and applied items as user has location preferences"
-    }
+    CONTENT GUIDELINES - KEEP IT SAFE & PROFESSIONAL:
+    1. Use only professional fashion terminology
+    2. Focus on clothing style, not intimate body details
+    3. Avoid age descriptors or suggestive language
+    4. Use terms like "model", "person" instead of age-specific words
+    5. Keep descriptions editorial and sophisticated
+    6. No brand names or copyrighted content
+    7. Focus on craftsmanship and design quality
+    8. Use professional photography language
     
-    Your output should ONLY be a detailed English description of ONE ARTISTIC IMAGE featuring the MAIN CHARACTER with all ITEMs (clothing, background, objects, accessories) naturally integrated with them${
+    LANGUAGE REQUIREMENTS:
+    - Output must be 100% ENGLISH only
+    - Use sophisticated fashion vocabulary
+    - Professional editorial tone
+    - Detailed but appropriate descriptions
+    - Focus on style and craftsmanship
+    
+    ENHANCED FASHION WRITING:
+    - Avoid: transparent, see-through, sheer, revealing, tight-fitting, form-fitting
+    - Use: tailored, well-fitted, contemporary cut, elegant silhouette, refined design
+    - Focus on fabric quality, construction, and styling rather than body emphasis
+    - Maintain editorial magazine sophistication
+    
+    OUTPUT FORMAT:
+    Create a single, flowing fashion photography description that reads like a professional editorial caption. Describe the complete look as if you're writing for a high-end fashion magazine${
       !hasLocationSettings
-        ? ", set in a beautifully crafted creative environment with perfect artistic lighting"
+        ? ", including the beautiful setting and lighting that creates the perfect fashion photography atmosphere"
         : ""
     }${
       hasValidSettings
-        ? " while incorporating the user's selected settings"
+        ? ". Naturally incorporate the user's style preferences into the description"
         : ""
     }.
+    
+    Remember: This should read like a beautiful, detailed fashion photography description, not a technical process explanation.
     `;
 
     console.log("Gemini'ye gönderilen istek:", promptForGemini);
@@ -594,6 +637,27 @@ async function pollReplicateResult(predictionId, maxAttempts = 60) {
         return result;
       } else if (result.status === "failed") {
         console.error("Replicate işlemi başarısız:", result.error);
+
+        // Sensitive content hatasını kontrol et (V2'den eklendi)
+        if (
+          result.error &&
+          typeof result.error === "string" &&
+          (result.error.includes("flagged as sensitive") ||
+            result.error.includes("E005") ||
+            result.error.includes("sensitive content"))
+        ) {
+          console.error(
+            "❌ Sensitive content hatası tespit edildi, polling durduruluyor"
+          );
+
+          // Özel bir error object döndür ki frontend'de yakalayabilelim
+          const sensitiveError = new Error(
+            "Your content has been flagged as inappropriate. Please try again with a different image or settings."
+          );
+          sensitiveError.type = "sensitive_content";
+          throw sensitiveError;
+        }
+
         // Content moderation hatası kontrolü - E005 kodu veya sensitive content
         if (
           result.error &&
@@ -607,7 +671,13 @@ async function pollReplicateResult(predictionId, maxAttempts = 60) {
             "🚫 Content moderation hatası tespit edildi, pooling hemen durduruluyor:",
             result.error
           );
-          throw new Error(`Content Moderation Error: ${result.error}`);
+
+          // Özel bir error object döndür ki frontend'de yakalayabilelim
+          const sensitiveError = new Error(
+            `Content Moderation Error: ${result.error}`
+          );
+          sensitiveError.type = "sensitive_content";
+          throw sensitiveError;
         }
         throw new Error(result.error || "Replicate processing failed");
       } else if (result.status === "canceled") {
@@ -1143,8 +1213,22 @@ async function createProductCanvas(canvasItems) {
 
 // Ana generate endpoint'i
 router.post("/generate", async (req, res) => {
+  // Kredi kontrolü ve düşme (V2'den eklendi)
+  const CREDIT_COST = 20; // Her oluşturma 20 kredi
+  let creditDeducted = false;
+  let userId; // Scope için önceden tanımla
+
   try {
-    const { ratio, promptText, referenceImages, settings, userId } = req.body;
+    const {
+      ratio,
+      promptText,
+      referenceImages,
+      settings,
+      userId: requestUserId,
+    } = req.body;
+
+    // userId'yi scope için ata
+    userId = requestUserId;
 
     if (
       !referenceImages ||
@@ -1157,6 +1241,77 @@ router.post("/generate", async (req, res) => {
           message: "En az 2 referenceImage (model + product) sağlanmalıdır.",
         },
       });
+    }
+
+    // Kredi kontrolü (V2'den eklendi)
+    if (userId && userId !== "anonymous_user") {
+      try {
+        console.log(`💳 Kullanıcı ${userId} için kredi kontrolü yapılıyor...`);
+
+        const { data: updatedUsers, error: deductError } = await supabase
+          .from("users")
+          .select("credit_balance")
+          .eq("id", userId)
+          .single();
+
+        if (deductError) {
+          console.error("❌ Kredi sorgulama hatası:", deductError);
+          return res.status(500).json({
+            success: false,
+            result: {
+              message: "Kredi sorgulama sırasında hata oluştu",
+              error: deductError.message,
+            },
+          });
+        }
+
+        const currentCreditCheck = updatedUsers?.credit_balance || 0;
+        if (currentCreditCheck < CREDIT_COST) {
+          return res.status(402).json({
+            success: false,
+            result: {
+              message: "Yetersiz kredi. Lütfen kredi satın alın.",
+              currentCredit: currentCreditCheck,
+              requiredCredit: CREDIT_COST,
+            },
+          });
+        }
+
+        // Krediyi düş
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({ credit_balance: currentCreditCheck - CREDIT_COST })
+          .eq("id", userId)
+          .eq("credit_balance", currentCreditCheck); // Optimistic locking
+
+        if (updateError) {
+          console.error("❌ Kredi düşme hatası:", updateError);
+          return res.status(500).json({
+            success: false,
+            result: {
+              message:
+                "Kredi düşme sırasında hata oluştu (başka bir işlem krediyi değiştirdi)",
+              error: updateError.message,
+            },
+          });
+        }
+
+        creditDeducted = true;
+        console.log(
+          `✅ ${CREDIT_COST} kredi başarıyla düşüldü. Yeni bakiye: ${
+            currentCreditCheck - CREDIT_COST
+          }`
+        );
+      } catch (creditManagementError) {
+        console.error("❌ Kredi yönetimi hatası:", creditManagementError);
+        return res.status(500).json({
+          success: false,
+          result: {
+            message: "Kredi yönetimi sırasında hata oluştu",
+            error: creditManagementError.message,
+          },
+        });
+      }
     }
 
     // Maksimum 5 görsel kontrolü (model face + model body + 3 ürün)
@@ -1249,6 +1404,32 @@ router.post("/generate", async (req, res) => {
 
     if (!initialResult.id) {
       console.error("Replicate prediction ID alınamadı:", initialResult);
+
+      // Kredi iade et (V2'den eklendi)
+      if (creditDeducted && userId && userId !== "anonymous_user") {
+        try {
+          const { data: currentUserCredit } = await supabase
+            .from("users")
+            .select("credit_balance")
+            .eq("id", userId)
+            .single();
+
+          await supabase
+            .from("users")
+            .update({
+              credit_balance:
+                (currentUserCredit?.credit_balance || 0) + CREDIT_COST,
+            })
+            .eq("id", userId);
+
+          console.log(
+            `💰 ${CREDIT_COST} kredi iade edildi (Prediction ID hatası)`
+          );
+        } catch (refundError) {
+          console.error("❌ Kredi iade hatası:", refundError);
+        }
+      }
+
       return res.status(500).json({
         success: false,
         result: {
@@ -1284,6 +1465,23 @@ router.post("/generate", async (req, res) => {
         if (faceSwapResult.success) {
           console.log("✅ Face-swap API işlemi başarılı");
 
+          // 💳 API başarılı olduktan sonra güncel kredi bilgisini al (V2'den eklendi)
+          let currentCredit = null;
+          if (userId && userId !== "anonymous_user") {
+            try {
+              const { data: updatedUser } = await supabase
+                .from("users")
+                .select("credit_balance")
+                .eq("id", userId)
+                .single();
+
+              currentCredit = updatedUser?.credit_balance || 0;
+              console.log(`💳 Güncel kredi balance: ${currentCredit}`);
+            } catch (creditError) {
+              console.error("❌ Güncel kredi sorgu hatası:", creditError);
+            }
+          }
+
           // Face-swap sonucunu client'e gönder
           const responseData = {
             success: true,
@@ -1294,6 +1492,7 @@ router.post("/generate", async (req, res) => {
               replicateData: finalResult,
               faceSwapData: faceSwapResult.result,
               originalFluxOutput: fluxOutputUrl, // Orijinal flux sonucunu da sakla
+              currentCredit: currentCredit, // 💳 Güncel kredi bilgisini response'a ekle
             },
           };
 
@@ -1307,7 +1506,28 @@ router.post("/generate", async (req, res) => {
           return res.status(200).json(responseData);
         } else {
           console.error("Face-swap API başarısız:", faceSwapResult.result);
+
+          // 💳 API başarılı olduktan sonra güncel kredi bilgisini al (V2'den eklendi)
+          let currentCredit = null;
+          if (userId && userId !== "anonymous_user") {
+            try {
+              const { data: updatedUser } = await supabase
+                .from("users")
+                .select("credit_balance")
+                .eq("id", userId)
+                .single();
+
+              currentCredit = updatedUser?.credit_balance || 0;
+              console.log(`💳 Güncel kredi balance: ${currentCredit}`);
+            } catch (creditError) {
+              console.error("❌ Güncel kredi sorgu hatası:", creditError);
+            }
+          }
+
           // Face-swap başarısız olursa orijinal flux sonucunu döndür
+          const errorMessage =
+            faceSwapResult.result.error ||
+            "Face-swap işlemi başarısız, orijinal sonuç döndürülüyor";
           const responseData = {
             success: true,
             result: {
@@ -1315,9 +1535,8 @@ router.post("/generate", async (req, res) => {
               originalPrompt: promptText,
               enhancedPrompt: enhancedPrompt,
               replicateData: finalResult,
-              faceSwapError:
-                faceSwapResult.result.error ||
-                "Face-swap işlemi başarısız, orijinal sonuç döndürülüyor",
+              faceSwapError: errorMessage,
+              currentCredit: currentCredit, // 💳 Güncel kredi bilgisini response'a ekle
             },
           };
 
@@ -1353,6 +1572,23 @@ router.post("/generate", async (req, res) => {
             "Face-swap işlemi 3 kez denendi ancak başarısız oldu. Orijinal sonuç döndürülüyor.";
         }
 
+        // 💳 API başarılı olduktan sonra güncel kredi bilgisini al (V2'den eklendi)
+        let currentCredit = null;
+        if (userId && userId !== "anonymous_user") {
+          try {
+            const { data: updatedUser } = await supabase
+              .from("users")
+              .select("credit_balance")
+              .eq("id", userId)
+              .single();
+
+            currentCredit = updatedUser?.credit_balance || 0;
+            console.log(`💳 Güncel kredi balance: ${currentCredit}`);
+          } catch (creditError) {
+            console.error("❌ Güncel kredi sorgu hatası:", creditError);
+          }
+        }
+
         // Face-swap hatası olursa orijinal flux sonucunu döndür
         const responseData = {
           success: true,
@@ -1362,6 +1598,7 @@ router.post("/generate", async (req, res) => {
             enhancedPrompt: enhancedPrompt,
             replicateData: finalResult,
             faceSwapError: errorMessage,
+            currentCredit: currentCredit, // 💳 Güncel kredi bilgisini response'a ekle
           },
         };
 
@@ -1376,6 +1613,30 @@ router.post("/generate", async (req, res) => {
       }
     } else {
       console.error("Replicate API başarısız:", finalResult);
+
+      // Kredi iade et (V2'den eklendi)
+      if (creditDeducted && userId && userId !== "anonymous_user") {
+        try {
+          const { data: currentUserCredit } = await supabase
+            .from("users")
+            .select("credit_balance")
+            .eq("id", userId)
+            .single();
+
+          await supabase
+            .from("users")
+            .update({
+              credit_balance:
+                (currentUserCredit?.credit_balance || 0) + CREDIT_COST,
+            })
+            .eq("id", userId);
+
+          console.log(`💰 ${CREDIT_COST} kredi iade edildi (Replicate hatası)`);
+        } catch (refundError) {
+          console.error("❌ Kredi iade hatası:", refundError);
+        }
+      }
+
       return res.status(500).json({
         success: false,
         result: {
@@ -1387,10 +1648,112 @@ router.post("/generate", async (req, res) => {
     }
   } catch (error) {
     console.error("Resim oluşturma hatası:", error);
+
+    // Kredi iade et (V2'den eklendi)
+    if (creditDeducted && userId && userId !== "anonymous_user") {
+      try {
+        const { data: currentUserCredit } = await supabase
+          .from("users")
+          .select("credit_balance")
+          .eq("id", userId)
+          .single();
+
+        await supabase
+          .from("users")
+          .update({
+            credit_balance:
+              (currentUserCredit?.credit_balance || 0) + CREDIT_COST,
+          })
+          .eq("id", userId);
+
+        console.log(`💰 ${CREDIT_COST} kredi iade edildi (Genel hata)`);
+      } catch (refundError) {
+        console.error("❌ Kredi iade hatası:", refundError);
+      }
+    }
+
+    // Sensitive content hatasını özel olarak handle et (V2'den eklendi)
+    if (
+      error.type === "sensitive_content" ||
+      (error.message && error.message.startsWith("SENSITIVE_CONTENT:")) ||
+      (error.message && error.message.includes("flagged as inappropriate")) ||
+      (error.message && error.message.includes("flagged as sensitive")) ||
+      (error.message && error.message.includes("E005")) ||
+      (error.message && error.message.includes("Content Moderation Error"))
+    ) {
+      console.log(
+        "🚨 Backend: Sensitive content hatası frontend'e gönderiliyor"
+      );
+      const cleanMessage = error.message
+        .replace("SENSITIVE_CONTENT: ", "")
+        .replace("Content Moderation Error: ", "");
+
+      // Status 200 ile gönder ama success: false yap ki frontend yakalayabilsin
+      return res.status(200).json({
+        success: false,
+        result: {
+          message: cleanMessage,
+          error_type: "sensitive_content",
+          user_friendly: true,
+        },
+      });
+    }
+
     return res.status(500).json({
       success: false,
       result: {
         message: "Resim oluşturma sırasında bir hata oluştu",
+        error: error.message,
+      },
+    });
+  }
+});
+
+// Kullanıcının mevcut kredisini getiren endpoint (V2'den eklendi)
+router.get("/credit/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId || userId === "anonymous_user") {
+      return res.status(200).json({
+        success: true,
+        result: {
+          credit: 0, // Anonymous kullanıcılar için sınırsız (veya 0 göster)
+          isAnonymous: true,
+        },
+      });
+    }
+
+    const { data: userCredit, error } = await supabase
+      .from("users")
+      .select("credit_balance")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("❌ Kredi sorgulama hatası:", error);
+      return res.status(500).json({
+        success: false,
+        result: {
+          message: "Kredi sorgulama sırasında hata oluştu",
+          error: error.message,
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      result: {
+        credit: userCredit?.credit_balance || 0,
+        isAnonymous: false,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Kredi endpoint hatası:", error);
+    return res.status(500).json({
+      success: false,
+      result: {
+        message: "Kredi bilgisi alınırken hata oluştu",
         error: error.message,
       },
     });

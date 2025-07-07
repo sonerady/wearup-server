@@ -350,9 +350,13 @@ async function enhancePromptWithGemini(
 ) {
   try {
     console.log("Gemini ile prompt iyileştirme başlatılıyor");
+    console.log(
+      "🎛️ [BACKEND GEMINI] Gelen settings detaylı:",
+      JSON.stringify(settings, null, 2)
+    );
 
     // Gemini modeli
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // Settings'in var olup olmadığını kontrol et
     const hasValidSettings =
@@ -361,59 +365,260 @@ async function enhancePromptWithGemini(
         ([key, value]) => value !== null && value !== undefined && value !== ""
       );
 
-    // Location related settings kontrolü
-    const hasLocationSettings =
+    // Spesifik ayarları kontrol et
+    const hasLocation =
+      settings && settings.location && settings.location.trim() !== "";
+    const hasWeather =
       settings &&
-      Object.keys(settings).some(
-        (key) =>
-          key.toLowerCase().includes("location") ||
-          key.toLowerCase().includes("background") ||
-          key.toLowerCase().includes("setting") ||
-          key.toLowerCase().includes("environment") ||
-          key.toLowerCase().includes("place")
-      );
+      (settings.season || settings.weather) &&
+      (settings.season || settings.weather).trim() !== "";
+    const hasProductColor =
+      settings &&
+      settings.productColor &&
+      settings.productColor !== "original" &&
+      settings.productColor.trim() !== "";
+    const hasAge = settings && settings.age && settings.age.trim() !== "";
+    const hasGender =
+      settings && settings.gender && settings.gender.trim() !== "";
+    const hasMood = settings && settings.mood && settings.mood.trim() !== "";
+    const hasPerspective =
+      settings && settings.perspective && settings.perspective.trim() !== "";
+    const hasAccessories =
+      settings && settings.accessories && settings.accessories.trim() !== "";
+    const hasSkinTone =
+      settings && settings.skinTone && settings.skinTone.trim() !== "";
+    const hasHairStyle =
+      settings && settings.hairStyle && settings.hairStyle.trim() !== "";
+    const hasHairColor =
+      settings && settings.hairColor && settings.hairColor.trim() !== "";
+    const hasBodyShape =
+      settings && settings.bodyShape && settings.bodyShape.trim() !== "";
+    const hasPose = settings && settings.pose && settings.pose.trim() !== "";
+    const hasEthnicity =
+      settings && settings.ethnicity && settings.ethnicity.trim() !== "";
+    const hasDetails =
+      settings && settings.details && settings.details.trim() !== "";
 
-    console.log("🎛️ [BACKEND GEMINI] Settings kontrolü:", hasValidSettings);
+    console.log("🎛️ [BACKEND GEMINI] Settings kontrolü:");
+    console.log("   - hasValidSettings:", hasValidSettings);
+    console.log("   - hasLocation:", hasLocation, "value:", settings?.location);
     console.log(
-      "📍 [BACKEND GEMINI] Location settings var mı:",
-      hasLocationSettings
+      "   - hasWeather:",
+      hasWeather,
+      "value:",
+      settings?.season || settings?.weather
     );
+    console.log(
+      "   - hasProductColor:",
+      hasProductColor,
+      "value:",
+      settings?.productColor
+    );
+    console.log("   - hasAge:", hasAge, "value:", settings?.age);
+    console.log("   - hasGender:", hasGender, "value:", settings?.gender);
+    console.log("   - hasMood:", hasMood, "value:", settings?.mood);
+    console.log(
+      "   - hasPerspective:",
+      hasPerspective,
+      "value:",
+      settings?.perspective
+    );
+    console.log(
+      "   - hasAccessories:",
+      hasAccessories,
+      "value:",
+      settings?.accessories
+    );
+    console.log("   - hasSkinTone:", hasSkinTone, "value:", settings?.skinTone);
+    console.log(
+      "   - hasHairStyle:",
+      hasHairStyle,
+      "value:",
+      settings?.hairStyle
+    );
+    console.log(
+      "   - hasHairColor:",
+      hasHairColor,
+      "value:",
+      settings?.hairColor
+    );
+    console.log(
+      "   - hasBodyShape:",
+      hasBodyShape,
+      "value:",
+      settings?.bodyShape
+    );
+    console.log("   - hasPose:", hasPose, "value:", settings?.pose);
+    console.log(
+      "   - hasEthnicity:",
+      hasEthnicity,
+      "value:",
+      settings?.ethnicity
+    );
+    console.log("   - hasDetails:", hasDetails, "value:", settings?.details);
 
     let settingsPromptSection = "";
 
     if (hasValidSettings) {
-      const settingsText = Object.entries(settings)
-        .filter(
-          ([key, value]) =>
-            value !== null && value !== undefined && value !== ""
-        )
-        .map(([key, value]) => `${key}: ${value}`)
-        .join(", ");
+      console.log(
+        "🎛️ [BACKEND GEMINI] Detaylı settings prompt oluşturuluyor..."
+      );
 
-      console.log("🎛️ [BACKEND GEMINI] Settings için prompt oluşturuluyor...");
-      console.log("📝 [BACKEND GEMINI] Settings text:", settingsText);
+      const settingsDescriptions = [];
 
-      settingsPromptSection = `
-    User selected settings: ${settingsText}
+      // Location/Environment
+      if (hasLocation) {
+        settingsDescriptions.push(`LOCATION/ENVIRONMENT: ${settings.location}`);
+        console.log("   ✅ Location eklendi:", settings.location);
+      }
+
+      // Weather/Season
+      if (hasWeather) {
+        const weatherValue = settings.season || settings.weather;
+        settingsDescriptions.push(`WEATHER/SEASON: ${weatherValue}`);
+        console.log("   ✅ Weather/Season eklendi:", weatherValue);
+      }
+
+      // Product Color
+      if (hasProductColor) {
+        settingsDescriptions.push(`PRODUCT COLOR: ${settings.productColor}`);
+        console.log("   ✅ Product Color eklendi:", settings.productColor);
+      }
+
+      // Demographics
+      if (hasAge) {
+        settingsDescriptions.push(`AGE: ${settings.age}`);
+        console.log("   ✅ Age eklendi:", settings.age);
+      }
+
+      if (hasGender) {
+        settingsDescriptions.push(`GENDER: ${settings.gender}`);
+        console.log("   ✅ Gender eklendi:", settings.gender);
+      }
+
+      if (hasEthnicity) {
+        settingsDescriptions.push(`ETHNICITY: ${settings.ethnicity}`);
+        console.log("   ✅ Ethnicity eklendi:", settings.ethnicity);
+      }
+
+      // Physical Attributes
+      if (hasSkinTone) {
+        settingsDescriptions.push(`SKIN TONE: ${settings.skinTone}`);
+        console.log("   ✅ Skin Tone eklendi:", settings.skinTone);
+      }
+
+      if (hasBodyShape) {
+        settingsDescriptions.push(`BODY SHAPE: ${settings.bodyShape}`);
+        console.log("   ✅ Body Shape eklendi:", settings.bodyShape);
+      }
+
+      // Hair
+      if (hasHairStyle) {
+        settingsDescriptions.push(`HAIR STYLE: ${settings.hairStyle}`);
+        console.log("   ✅ Hair Style eklendi:", settings.hairStyle);
+      }
+
+      if (hasHairColor) {
+        settingsDescriptions.push(`HAIR COLOR: ${settings.hairColor}`);
+        console.log("   ✅ Hair Color eklendi:", settings.hairColor);
+      }
+
+      // Style & Mood
+      if (hasMood) {
+        settingsDescriptions.push(`MOOD/EXPRESSION: ${settings.mood}`);
+        console.log("   ✅ Mood eklendi:", settings.mood);
+      }
+
+      if (hasPerspective) {
+        settingsDescriptions.push(
+          `CAMERA PERSPECTIVE: ${settings.perspective}`
+        );
+        console.log("   ✅ Perspective eklendi:", settings.perspective);
+      }
+
+      if (hasPose) {
+        settingsDescriptions.push(`POSE: ${settings.pose}`);
+        console.log("   ✅ Pose eklendi:", settings.pose);
+      }
+
+      // Accessories
+      if (hasAccessories) {
+        settingsDescriptions.push(`ACCESSORIES: ${settings.accessories}`);
+        console.log("   ✅ Accessories eklendi:", settings.accessories);
+      }
+
+      // Custom Details
+      if (hasDetails) {
+        settingsDescriptions.push(`ADDITIONAL DETAILS: ${settings.details}`);
+        console.log("   ✅ Custom Details eklendi:", settings.details);
+      }
+
+      if (settingsDescriptions.length > 0) {
+        settingsPromptSection = `
+    USER SELECTED DETAILED SETTINGS:
+    ${settingsDescriptions.join("\n    ")}
+
+     FLUX KONTEXT PROMPT OPTIMIZATION (CRITICAL FOR BEST RESULTS):
     
-    SETTINGS DETAIL FOR BETTER PROMPT CREATION:
-    ${Object.entries(settings)
-      .filter(
-        ([key, value]) => value !== null && value !== undefined && value !== ""
-      )
-      .map(
-        ([key, value]) =>
-          `- ${key.charAt(0).toUpperCase() + key.slice(1)}: ${value}`
-      )
-      .join("\n    ")}
+    You are generating a prompt for FLUX Kontext, a surgical image editing model. Follow these MANDATORY guidelines:
     
-    IMPORTANT: Please incorporate the user settings above into your description when appropriate.`;
+    🔧 PROMPT STRUCTURE (EXACTLY 3 CLAUSES):
+    1) [MAIN_ACTION] - Start with precise action verb (Replace) + specific target
+    2) [PRESERVE] - "while keeping" + ALL elements that must remain unchanged
+    3) [DETAILS] - Camera, lighting, style refinements, scene context
+    
+    📏 CRITICAL LIMITS:
+    - MAXIMUM 512 tokens (Kontext will cut off longer prompts)
+    - ONE flowing sentence with semicolons separating the 3 clauses
+    - NO line breaks or multiple sentences
+    
+    🎯 ACTION VERBS (Use these proven high-impact verbs):
+    - Change (for color, material, style modifications)
+    - Transform (for style transfers)
+    - Replace (for object substitution)
+    - Add (for new elements)
+    - Remove (for deletions)
+    
+    🛡️ PRESERVE CLAUSE (NEVER OMIT):
+    Essential to prevent unwanted artifacts. Always include "while keeping" + specify:
+    - Pose and body positioning
+    - Facial features and expression
+    - Background elements
+    - Lighting conditions
+    - All original garment details not being changed
+    - Construction, fit, and proportions
+    
+    IMPORTANT INSTRUCTION: Generate ONLY a single, flowing FLUX Kontext prompt following the 3-clause structure. Do not include explanations, introductions, or commentary. The prompt should be surgical and specific, not descriptive scene creation.
+
+    LANGUAGE NORMALIZATION RULES:
+    - Translate every word and phrase that is not in English (e.g., colors, locations, garment descriptors) into English in the generated prompt. Example: convert "beyaz studio" to "white studio". The final prompt MUST be entirely in English.
+    
+    SETTINGS INTEGRATION REQUIREMENTS:
+    - MANDATORY: Incorporate ALL the above user settings into the final description
+    - Apply location/environment settings for background and lighting
+    - Apply weather/season settings for appropriate atmosphere and clothing interaction
+    - Apply physical characteristics (age, gender, ethnicity, skin tone, body shape) accurately
+    - Apply hair settings (style and color) precisely
+    - Apply mood and pose settings for expression and posture
+    - Apply camera perspective settings for the photography angle
+    - Apply accessories settings as additional items worn by the model
+    - Apply product color settings to modify the garment colors as specified
+    - Apply additional details for extra customization
+    - Ensure all settings work harmoniously together for a cohesive look`;
+
+        console.log(
+          "📝 [BACKEND GEMINI] Settings descriptions hazırlandı:",
+          settingsDescriptions
+        );
+      } else {
+        console.log("⚠️ [BACKEND GEMINI] Hiçbir geçerli setting bulunamadı");
+      }
     }
 
     // Background/location prompt section - sadece location settings yoksa ekle
     let backgroundPromptSection = "";
 
-    if (!hasLocationSettings) {
+    if (!hasLocation) {
       backgroundPromptSection = `
     
     CREATIVE BACKGROUND REQUIREMENTS (No location specified by user):
@@ -437,120 +642,107 @@ async function enhancePromptWithGemini(
       backgroundPromptSection = `
     
     BACKGROUND NOTE (User specified location settings):
-    6. DO NOT add additional background descriptions - user has specified location preferences in settings
-    7. Focus only on the clothing, body, and pose descriptions as per user's location settings`;
+    6. USER HAS SPECIFIED LOCATION: "${settings.location}" - Use this location for the background
+    7. Focus on making the specified location look professional and photogenic
+    8. Ensure lighting and atmosphere match the location and complement the overall look`;
     }
 
     // Gemini'ye gönderilecek metin
     let promptForGemini = `
-    The following is an original prompt from a user: "${originalPrompt}"
+    Create a detailed, professional fashion photography description based on this original user input: "${originalPrompt}"
     
     ${settingsPromptSection}
     
     ${backgroundPromptSection}
     
-    This is for a virtual try-on application. The combined image shows two parts:
-    - LEFT: Full body model photo showing pose and body structure
-    - RIGHT: Clothing/product that should be virtually tried on
+    You are looking at a combined image showing:
+    - LEFT SIDE: A person with specific body type, pose, and physical characteristics
+    - RIGHT SIDE: Fashion clothing/accessories/products that should be styled on the person
     
-    NOTE: The face will be added later through a separate face-swap process, so focus on body and clothing details.
+    🚨 CRITICAL REPLACEMENT INSTRUCTION 🚨:
+    - COMPLETELY IGNORE AND DO NOT MENTION ANY CLOTHING that the LEFT person is currently wearing
+    - The LEFT person's existing clothes/outfits MUST BE REPLACED with the RIGHT side products
+    - ONLY describe the person's body, pose, facial features, and physical characteristics from the LEFT side
+    - NEVER describe or reference the original clothing on the LEFT person
+    - The RIGHT side products will REPLACE whatever the LEFT person is wearing
     
-    CRITICAL VIRTUAL TRY-ON REQUIREMENTS:
-    1. Use the BODY/POSE from the LEFT side of the image  
-    2. Show the PRODUCTS from the RIGHT side being worn by the model body
-    3. Describe the clothing items from the product image in EXTREME DETAIL:
-       - Exact colors, patterns, textures, fabrics
-       - Specific design elements, cuts, silhouettes
-       - Any unique features, embellishments, or details
-       - How the garment fits and drapes on the body
-       - Material appearance (matte, shiny, textured, smooth)
-    4. IMPORTANT: Describe the person's BODY TYPE and PHYSICAL CHARACTERISTICS:
-       - Height (tall, medium, short)
-       - Body build (slim, athletic, curvy, plus-size, etc.)
-       - Body proportions and shape
-       - Overall physique and body structure
-       - How the clothing should fit this specific body type
-    5. Create a seamless virtual try-on where the model from the left is wearing the products from the right
+    🎯 REPLACEMENT TASK: Create a comprehensive fashion photography description where the person from the LEFT is wearing ONLY the clothing/products from the RIGHT side, completely replacing their original outfit.
     
-    CRITICAL CONTENT MODERATION GUIDELINES - AVOID THESE:
-    1. DO NOT mention age descriptors (young, old, teen, etc.)
-    2. DO NOT use detailed body part descriptions (chest, bust, hips, waist details)
-    3. DO NOT use intimate/underwear terminology (bra, panties, lingerie, etc.)
-    4. DO NOT use suggestive clothing descriptions (tight, snug, revealing, etc.)
-    5. DO NOT mention brand names or copyrighted content
-    6. DO NOT use terms that could be sexually suggestive
-    7. AVOID detailed physical attraction descriptions
-    8. Use neutral, professional fashion terminology only
-    9. Focus on clothing style, not body curves or intimate fits
-    10. Keep descriptions professional and suitable for all audiences
+    CORE REQUIREMENTS:
+    1. PERSON CHARACTERISTICS: Describe the person from the LEFT side - their body type, height, build, posture, pose, and facial features (🚨 ABSOLUTELY IGNORE THEIR CURRENT CLOTHING 🚨)
+    2. REPLACEMENT CLOTHING DETAILS: Describe in EXTREME DETAIL ONLY the clothing/products from the RIGHT side that will REPLACE the original outfit:
+       - Exact colors, patterns, textures, fabrics, materials
+       - Specific cuts, silhouettes, design elements
+       - Unique features, embellishments, details, finishes
+       - How each garment fits and drapes on this specific person's body
+       - Material characteristics (matte, glossy, textured, smooth, etc.)
+    3. REPLACEMENT STYLING: Show how the RIGHT side products look when they REPLACE the original outfit on the LEFT side person
+    4. COMPLETE OUTFIT REPLACEMENT: Create a seamless look where all clothing items from the RIGHT side completely replace the original clothing and work together harmoniously
     
-    SAFE ALTERNATIVE TERMS:
-    - Instead of "young woman" → "person" or "model"
-    - Instead of "sports bra" → "athletic top" or "fitted top"
-    - Instead of "tight/snug" → "well-fitted" or "tailored"
-    - Instead of "accentuating curves" → "flattering silhouette"
-    - Instead of body parts → "overall appearance" or "silhouette"
-    - Instead of "toned" → "fit" or "healthy"
+    DETAILED PRODUCT ANALYSIS REQUIRED (REPLACEMENT FOCUS):
+    - Analyze EVERY visible clothing item and accessory from the RIGHT side ONLY - these will REPLACE the original outfit
+    - 🚨 STRICTLY FORBIDDEN: DO NOT mention, describe, or reference ANY clothing visible on the LEFT side person 🚨
+    - Describe fabric textures, weaves, finishes in detail for the REPLACEMENT clothing
+    - Mention specific design elements of REPLACEMENT items: buttons, zippers, seams, cuts, patterns
+    - Describe how each REPLACEMENT piece fits this particular body type and height
+    - Include color descriptions with nuances and undertones for the NEW outfit
+    - Mention any logos, prints, or decorative elements on the REPLACEMENT clothing (but avoid brand names)
+    - Describe the overall style aesthetic and fashion category of the COMPLETE NEW OUTFIT
     
-    Create a detailed fashion description prompt that describes:
-    1. The person with the face from the LEFT image and body pose from the MIDDLE image
-    2. DETAILED BODY TYPE DESCRIPTION: Analyze and describe the person's height, build, proportions, and physique (using safe terminology)
-    3. This person wearing the clothing items from the RIGHT side of the image
-    4. Include specific details about the clothing items, colors, styles, and textures
-    5. Include details about the setting, pose, and overall aesthetic
-    6. VERY IMPORTANT: Describe the products from the right side in extensive detail as if they are being worn by the combined person (face + body)
-    7. CRITICAL: Include how the clothing fits and looks on this specific body type and height (using professional language)
+    BODY & STYLING INTEGRATION (REPLACEMENT OUTCOME):
+    - How the RIGHT side REPLACEMENT clothing complements the person's body proportions
+    - How the NEW outfit's fit enhances their natural silhouette
+    - How the REPLACEMENT clothing colors work with their overall appearance
+    - How the NEW style matches their pose and attitude
+    - The transformation from original outfit to the NEW REPLACEMENT outfit
+    
     ${
-      !hasLocationSettings
-        ? "8. MANDATORY: Create a beautiful, creative background that enhances the fashion photography as described above"
-        : "8. Focus on clothing and body description only - respect user's location settings"
-    }
-    ${
-      !hasLocationSettings
-        ? "9. Make the background and lighting feel professionally crafted and complement the fashion style"
+      hasProductColor
+        ? `
+    IMPORTANT COLOR CUSTOMIZATION:
+    - The user wants to modify the clothing color to: "${settings.productColor}"
+    - Apply this color ONLY to the main garment/product from the RIGHT side
+    - Describe how this new color looks on the person
+    - Ensure the color suits their overall appearance and styling
+    `
         : ""
     }
     
-    STRICT LANGUAGE REQUIREMENTS: 
-    - The final prompt must be 100% ENGLISH ONLY - ZERO foreign words allowed
-    - ALL non-English words must be translated to English
-    - Use ONLY professional, family-friendly fashion terminology
-    - AVOID any content that could trigger content moderation systems
+    CONTENT GUIDELINES - KEEP IT SAFE & PROFESSIONAL:
+    1. Use only professional fashion terminology
+    2. Focus on clothing style, not intimate body details
+    3. Avoid age descriptors or suggestive language
+    4. Use terms like "model", "person" instead of age-specific words
+    5. Keep descriptions editorial and sophisticated
+    6. No brand names or copyrighted content
+    7. Focus on craftsmanship and design quality
+    8. Use professional photography language
     
-    CRITICAL REQUIREMENTS:
-    1. The output prompt must be PURE ENGLISH - no foreign language words whatsoever
-    2. Combine the face from LEFT + body from MIDDLE + products from RIGHT
-    3. Describe the model wearing the clothing items from the product image with EXTREME DETAIL
-    4. Include ALL types of clothing and accessories visible in the product image
-    5. Make it sound like a professional fashion photography description
-    6. Focus heavily on product details: fabric texture, color nuances, design elements, fit characteristics
-    7. Describe how the clothing items from the right side look when worn by the person (face from left + body from middle)
-    8. Create a seamless combination of the three elements: face + body + clothing
-    9. MANDATORY: Always include detailed body type analysis (height, build, proportions) in the description
-    10. Describe how the specific garments complement and fit the person's body type and height
-    11. CRITICAL: Use only content-moderation-safe language and terminology
-    12. AVOID any terms that could be flagged as sensitive or inappropriate
-    13. Focus on professional fashion description, not physical attractiveness
-    ${
-      !hasLocationSettings
-        ? "14. MANDATORY: Include creative, atmospheric background and lighting that creates editorial-quality fashion photography"
-        : "14. Focus exclusively on fashion and body details as user has location preferences"
-    }
-    ${
-      !hasLocationSettings
-        ? "15. Make the overall scene feel like a professional fashion shoot with perfect ambiance"
-        : ""
-    }
+    LANGUAGE REQUIREMENTS:
+    - Output must be 100% ENGLISH only
+    - Use sophisticated fashion vocabulary
+    - Professional editorial tone
+    - Detailed but appropriate descriptions
+    - Focus on style and craftsmanship
     
-    Your output should ONLY be the virtual try-on prompt in PURE ENGLISH that describes the complete fashion look with extensive product details, body type analysis, physical characteristics using SAFE, PROFESSIONAL terminology${
-      !hasLocationSettings
-        ? ", and a beautifully crafted creative background with perfect lighting"
+    ENHANCED FASHION WRITING:
+    - Avoid: transparent, see-through, sheer, revealing, tight-fitting, form-fitting
+    - Use: tailored, well-fitted, contemporary cut, elegant silhouette, refined design
+    - Focus on fabric quality, construction, and styling rather than body emphasis
+    - Maintain editorial magazine sophistication
+    
+    OUTPUT FORMAT:
+    Create a single, flowing fashion photography description that reads like a professional editorial caption. Describe the COMPLETE REPLACEMENT OUTFIT as if you're writing for a high-end fashion magazine${
+      !hasLocation
+        ? ", including the beautiful setting and lighting that creates the perfect fashion photography atmosphere"
         : ""
     }${
       hasValidSettings
-        ? " and incorporates relevant user settings (converted to natural English descriptions)"
+        ? ". Naturally incorporate the user's style preferences into the description"
         : ""
     }.
+    
+    🚨 FINAL REMINDER: The description should show the person wearing ONLY the RIGHT side products, completely replacing their original clothing. This should read like a beautiful, detailed fashion photography description of the NEW OUTFIT, not the original clothing or a technical process explanation.
     `;
 
     console.log("Gemini'ye gönderilen istek:", promptForGemini);
@@ -628,6 +820,23 @@ async function pollReplicateResult(predictionId, maxAttempts = 60) {
         return result;
       } else if (result.status === "failed") {
         console.error("Replicate işlemi başarısız:", result.error);
+
+        // Sensitive content hatasını kontrol et (V2'den eklendi)
+        if (
+          result.error &&
+          typeof result.error === "string" &&
+          (result.error.includes("flagged as sensitive") ||
+            result.error.includes("E005") ||
+            result.error.includes("sensitive content"))
+        ) {
+          console.error(
+            "❌ Sensitive content hatası tespit edildi, polling durduruluyor"
+          );
+          throw new Error(
+            "SENSITIVE_CONTENT: Your content has been flagged as inappropriate. Please try again with a different image or settings."
+          );
+        }
+
         // Content moderation hatası kontrolü - E005 kodu veya sensitive content
         if (
           result.error &&
@@ -683,6 +892,7 @@ async function pollReplicateResult(predictionId, maxAttempts = 60) {
 async function performFaceSwapWithRetry(
   faceImageUrl,
   fluxOutputUrl,
+  userId,
   maxRetries = 3
 ) {
   console.log(`🔄 Face-swap işlemi başlatılıyor (max ${maxRetries} deneme)...`);
@@ -816,8 +1026,22 @@ async function performFaceSwapWithRetry(
 
 // Ana generate endpoint'i
 router.post("/generate", async (req, res) => {
+  // Kredi kontrolü ve düşme (V2'den eklendi)
+  const CREDIT_COST = 20; // Her oluşturma 20 kredi
+  let creditDeducted = false;
+  let userId; // Scope için önceden tanımla
+
   try {
-    const { ratio, promptText, referenceImages, settings, userId } = req.body;
+    const {
+      ratio,
+      promptText,
+      referenceImages,
+      settings,
+      userId: requestUserId,
+    } = req.body;
+
+    // userId'yi scope için ata
+    userId = requestUserId;
 
     if (
       !promptText ||
@@ -832,6 +1056,77 @@ router.post("/generate", async (req, res) => {
             "Geçerli bir promptText ve en az 3 referenceImage (face + model + product) sağlanmalıdır.",
         },
       });
+    }
+
+    // Kredi kontrolü (V2'den eklendi)
+    if (userId && userId !== "anonymous_user") {
+      try {
+        console.log(`💳 Kullanıcı ${userId} için kredi kontrolü yapılıyor...`);
+
+        const { data: updatedUsers, error: deductError } = await supabase
+          .from("users")
+          .select("credit_balance")
+          .eq("id", userId)
+          .single();
+
+        if (deductError) {
+          console.error("❌ Kredi sorgulama hatası:", deductError);
+          return res.status(500).json({
+            success: false,
+            result: {
+              message: "Kredi sorgulama sırasında hata oluştu",
+              error: deductError.message,
+            },
+          });
+        }
+
+        const currentCreditCheck = updatedUsers?.credit_balance || 0;
+        if (currentCreditCheck < CREDIT_COST) {
+          return res.status(402).json({
+            success: false,
+            result: {
+              message: "Yetersiz kredi. Lütfen kredi satın alın.",
+              currentCredit: currentCreditCheck,
+              requiredCredit: CREDIT_COST,
+            },
+          });
+        }
+
+        // Krediyi düş
+        const { error: updateError } = await supabase
+          .from("users")
+          .update({ credit_balance: currentCreditCheck - CREDIT_COST })
+          .eq("id", userId)
+          .eq("credit_balance", currentCreditCheck); // Optimistic locking
+
+        if (updateError) {
+          console.error("❌ Kredi düşme hatası:", updateError);
+          return res.status(500).json({
+            success: false,
+            result: {
+              message:
+                "Kredi düşme sırasında hata oluştu (başka bir işlem krediyi değiştirdi)",
+              error: updateError.message,
+            },
+          });
+        }
+
+        creditDeducted = true;
+        console.log(
+          `✅ ${CREDIT_COST} kredi başarıyla düşüldü. Yeni bakiye: ${
+            currentCreditCheck - CREDIT_COST
+          }`
+        );
+      } catch (creditManagementError) {
+        console.error("❌ Kredi yönetimi hatası:", creditManagementError);
+        return res.status(500).json({
+          success: false,
+          result: {
+            message: "Kredi yönetimi sırasında hata oluştu",
+            error: creditManagementError.message,
+          },
+        });
+      }
     }
 
     console.log("🎛️ [BACKEND] Gelen settings parametresi:", settings);
@@ -856,26 +1151,15 @@ router.post("/generate", async (req, res) => {
     console.log("Model görseli:", modelImage.uri);
     console.log("Ürün görseli:", productImage.uri);
 
-    // 3 görseli birleştir (Gemini analizi için)
-    const combinedImageUrlForGemini = await combineImagesHorizontally(
-      faceImage.uri,
-      modelImage.uri,
-      productImage.uri
-    );
-
-    // Sadece model + product birleştir (Flux API için)
-    const combinedImageUrlForFlux = await combineModelAndProduct(
+    // Sadece model + product birleştir (hem Gemini hem Flux için)
+    const combinedImageUrl = await combineModelAndProduct(
       modelImage.uri,
       productImage.uri
     );
 
     console.log(
-      "Gemini için birleştirilmiş görsel URL'si:",
-      combinedImageUrlForGemini
-    );
-    console.log(
-      "Flux için birleştirilmiş görsel URL'si:",
-      combinedImageUrlForFlux
+      "Model + Product birleştirilmiş görsel URL'si:",
+      combinedImageUrl
     );
 
     // Aspect ratio'yu formatla
@@ -887,7 +1171,7 @@ router.post("/generate", async (req, res) => {
     // Kullanıcının prompt'unu Gemini ile iyileştir (3 görsel birleşimini kullan)
     const enhancedPrompt = await enhancePromptWithGemini(
       promptText,
-      combinedImageUrlForGemini,
+      combinedImageUrl,
       settings || {}
     );
 
@@ -905,7 +1189,7 @@ router.post("/generate", async (req, res) => {
         json: {
           input: {
             prompt: enhancedPrompt,
-            input_image: combinedImageUrlForFlux, // Face olmadan sadece model + product
+            input_image: combinedImageUrl, // Face olmadan sadece model + product
             aspect_ratio: formattedRatio,
           },
         },
@@ -918,6 +1202,32 @@ router.post("/generate", async (req, res) => {
 
     if (!initialResult.id) {
       console.error("Replicate prediction ID alınamadı:", initialResult);
+
+      // Kredi iade et (V2'den eklendi)
+      if (creditDeducted && userId && userId !== "anonymous_user") {
+        try {
+          const { data: currentUserCredit } = await supabase
+            .from("users")
+            .select("credit_balance")
+            .eq("id", userId)
+            .single();
+
+          await supabase
+            .from("users")
+            .update({
+              credit_balance:
+                (currentUserCredit?.credit_balance || 0) + CREDIT_COST,
+            })
+            .eq("id", userId);
+
+          console.log(
+            `💰 ${CREDIT_COST} kredi iade edildi (Prediction ID hatası)`
+          );
+        } catch (refundError) {
+          console.error("❌ Kredi iade hatası:", refundError);
+        }
+      }
+
       return res.status(500).json({
         success: false,
         result: {
@@ -947,11 +1257,29 @@ router.post("/generate", async (req, res) => {
         // Face-swap işlemi için retry mekanizmasını kullan
         const faceSwapResult = await performFaceSwapWithRetry(
           faceImageUrl,
-          fluxOutputUrl
+          fluxOutputUrl,
+          userId
         );
 
         if (faceSwapResult.success) {
           console.log("✅ Face-swap API işlemi başarılı");
+
+          // 💳 API başarılı olduktan sonra güncel kredi bilgisini al (V2'den eklendi)
+          let currentCredit = null;
+          if (userId && userId !== "anonymous_user") {
+            try {
+              const { data: updatedUser } = await supabase
+                .from("users")
+                .select("credit_balance")
+                .eq("id", userId)
+                .single();
+
+              currentCredit = updatedUser?.credit_balance || 0;
+              console.log(`💳 Güncel kredi balance: ${currentCredit}`);
+            } catch (creditError) {
+              console.error("❌ Güncel kredi sorgu hatası:", creditError);
+            }
+          }
 
           // Face-swap sonucunu client'e gönder
           const responseData = {
@@ -963,6 +1291,7 @@ router.post("/generate", async (req, res) => {
               replicateData: finalResult,
               faceSwapData: faceSwapResult.result,
               originalFluxOutput: fluxOutputUrl, // Orijinal flux sonucunu da sakla
+              currentCredit: currentCredit, // 💳 Güncel kredi bilgisini response'a ekle
             },
           };
 
@@ -976,6 +1305,24 @@ router.post("/generate", async (req, res) => {
           return res.status(200).json(responseData);
         } else {
           console.error("Face-swap API başarısız:", faceSwapResult.result);
+
+          // 💳 API başarılı olduktan sonra güncel kredi bilgisini al (V2'den eklendi)
+          let currentCredit = null;
+          if (userId && userId !== "anonymous_user") {
+            try {
+              const { data: updatedUser } = await supabase
+                .from("users")
+                .select("credit_balance")
+                .eq("id", userId)
+                .single();
+
+              currentCredit = updatedUser?.credit_balance || 0;
+              console.log(`💳 Güncel kredi balance: ${currentCredit}`);
+            } catch (creditError) {
+              console.error("❌ Güncel kredi sorgu hatası:", creditError);
+            }
+          }
+
           // Face-swap başarısız olursa orijinal flux sonucunu döndür
           const responseData = {
             success: true,
@@ -987,6 +1334,7 @@ router.post("/generate", async (req, res) => {
               faceSwapError:
                 faceSwapResult.result.error ||
                 "Face-swap işlemi başarısız, orijinal sonuç döndürülüyor",
+              currentCredit: currentCredit, // 💳 Güncel kredi bilgisini response'a ekle
             },
           };
 
@@ -1022,6 +1370,23 @@ router.post("/generate", async (req, res) => {
             "Face-swap işlemi 3 kez denendi ancak başarısız oldu. Orijinal sonuç döndürülüyor.";
         }
 
+        // 💳 API başarılı olduktan sonra güncel kredi bilgisini al (V2'den eklendi)
+        let currentCredit = null;
+        if (userId && userId !== "anonymous_user") {
+          try {
+            const { data: updatedUser } = await supabase
+              .from("users")
+              .select("credit_balance")
+              .eq("id", userId)
+              .single();
+
+            currentCredit = updatedUser?.credit_balance || 0;
+            console.log(`💳 Güncel kredi balance: ${currentCredit}`);
+          } catch (creditError) {
+            console.error("❌ Güncel kredi sorgu hatası:", creditError);
+          }
+        }
+
         // Face-swap hatası olursa orijinal flux sonucunu döndür
         const responseData = {
           success: true,
@@ -1031,6 +1396,7 @@ router.post("/generate", async (req, res) => {
             enhancedPrompt: enhancedPrompt,
             replicateData: finalResult,
             faceSwapError: errorMessage,
+            currentCredit: currentCredit, // 💳 Güncel kredi bilgisini response'a ekle
           },
         };
 
@@ -1045,6 +1411,30 @@ router.post("/generate", async (req, res) => {
       }
     } else {
       console.error("Replicate API başarısız:", finalResult);
+
+      // Kredi iade et (V2'den eklendi)
+      if (creditDeducted && userId && userId !== "anonymous_user") {
+        try {
+          const { data: currentUserCredit } = await supabase
+            .from("users")
+            .select("credit_balance")
+            .eq("id", userId)
+            .single();
+
+          await supabase
+            .from("users")
+            .update({
+              credit_balance:
+                (currentUserCredit?.credit_balance || 0) + CREDIT_COST,
+            })
+            .eq("id", userId);
+
+          console.log(`💰 ${CREDIT_COST} kredi iade edildi (Replicate hatası)`);
+        } catch (refundError) {
+          console.error("❌ Kredi iade hatası:", refundError);
+        }
+      }
+
       return res.status(500).json({
         success: false,
         result: {
@@ -1056,10 +1446,112 @@ router.post("/generate", async (req, res) => {
     }
   } catch (error) {
     console.error("Resim oluşturma hatası:", error);
+
+    // Kredi iade et (V2'den eklendi)
+    if (creditDeducted && userId && userId !== "anonymous_user") {
+      try {
+        const { data: currentUserCredit } = await supabase
+          .from("users")
+          .select("credit_balance")
+          .eq("id", userId)
+          .single();
+
+        await supabase
+          .from("users")
+          .update({
+            credit_balance:
+              (currentUserCredit?.credit_balance || 0) + CREDIT_COST,
+          })
+          .eq("id", userId);
+
+        console.log(`💰 ${CREDIT_COST} kredi iade edildi (Genel hata)`);
+      } catch (refundError) {
+        console.error("❌ Kredi iade hatası:", refundError);
+      }
+    }
+
+    // Sensitive content hatasını özel olarak handle et (V2'den eklendi)
+    if (
+      error.type === "sensitive_content" ||
+      (error.message && error.message.startsWith("SENSITIVE_CONTENT:")) ||
+      (error.message && error.message.includes("flagged as inappropriate")) ||
+      (error.message && error.message.includes("flagged as sensitive")) ||
+      (error.message && error.message.includes("E005")) ||
+      (error.message && error.message.includes("Content Moderation Error"))
+    ) {
+      console.log(
+        "🚨 Backend: Sensitive content hatası frontend'e gönderiliyor"
+      );
+      const cleanMessage = error.message
+        .replace("SENSITIVE_CONTENT: ", "")
+        .replace("Content Moderation Error: ", "");
+
+      // Status 200 ile gönder ama success: false yap ki frontend yakalayabilsin
+      return res.status(200).json({
+        success: false,
+        result: {
+          message: cleanMessage,
+          error_type: "sensitive_content",
+          user_friendly: true,
+        },
+      });
+    }
+
     return res.status(500).json({
       success: false,
       result: {
         message: "Resim oluşturma sırasında bir hata oluştu",
+        error: error.message,
+      },
+    });
+  }
+});
+
+// Kullanıcının mevcut kredisini getiren endpoint (V2'den eklendi)
+router.get("/credit/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId || userId === "anonymous_user") {
+      return res.status(200).json({
+        success: true,
+        result: {
+          credit: 0, // Anonymous kullanıcılar için sınırsız (veya 0 göster)
+          isAnonymous: true,
+        },
+      });
+    }
+
+    const { data: userCredit, error } = await supabase
+      .from("users")
+      .select("credit_balance")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("❌ Kredi sorgulama hatası:", error);
+      return res.status(500).json({
+        success: false,
+        result: {
+          message: "Kredi sorgulama sırasında hata oluştu",
+          error: error.message,
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      result: {
+        credit: userCredit?.credit_balance || 0,
+        isAnonymous: false,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Kredi endpoint hatası:", error);
+    return res.status(500).json({
+      success: false,
+      result: {
+        message: "Kredi bilgisi alınırken hata oluştu",
         error: error.message,
       },
     });
