@@ -345,7 +345,6 @@ function formatAspectRatio(ratioStr) {
 // Prompt'u iyileştirmek için Gemini'yi kullan (Gen4 Image formatında)
 async function enhancePromptWithGemini(
   originalPrompt,
-  faceImageUrl,
   modelImageUrl,
   productImageUrl,
   settings = {}
@@ -358,7 +357,7 @@ async function enhancePromptWithGemini(
     );
 
     // Gemini modeli
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Settings'in var olup olmadığını kontrol et
     const hasValidSettings =
@@ -623,23 +622,13 @@ async function enhancePromptWithGemini(
     if (!hasLocation) {
       backgroundPromptSection = `
     
-    CREATIVE BACKGROUND REQUIREMENTS (No location specified by user):
-    6. CREATE a beautiful, creative background that perfectly complements the clothing style and fashion aesthetic
-    7. CHOOSE between indoor or outdoor settings based on what works best with the outfit:
-       - For casual/sporty outfits: outdoor settings like parks, streets, beaches, cafes
-       - For formal/elegant outfits: indoor settings like studios, galleries, upscale interiors
-       - For trendy/fashion outfits: modern urban settings, stylish interiors, artistic spaces
-    8. FOCUS on perfect lighting that enhances both the clothing and the model:
-       - Natural daylight for outdoor scenes
-       - Professional studio lighting for indoor scenes
-       - Golden hour lighting for romantic/elegant looks
-       - Modern architectural lighting for contemporary styles
-    9. MAKE the background atmospheric and mood-appropriate:
-       - Colors should complement the clothing colors
-       - The setting should enhance the overall fashion narrative
-       - Avoid distracting elements that take focus away from the outfit
-    10. BE CREATIVE - choose unique, visually striking backgrounds that make the photo editorial-quality
-    11. ENSURE the lighting, atmosphere, and setting create a cohesive, professional fashion photography look`;
+    BACKGROUND REQUIREMENTS (No location specified by user):
+    6. KEEP the original background from @TAK model image (preserve the existing setting)
+    7. MAINTAIN the original lighting and atmosphere from @TAK model's environment
+    8. DO NOT change the background setting, location, or environment
+    9. FOCUS on preserving the original backdrop while enhancing the overall look
+    10. The background should remain exactly as it appears in the @TAK reference image
+    11. Only the clothing should change - background stays the same`;
     } else {
       backgroundPromptSection = `
     
@@ -651,7 +640,16 @@ async function enhancePromptWithGemini(
 
     // Gemini'ye gönderilecek metin (Gen4 Image formatında)
     let promptForGemini = `
+    🚨🚨 CRITICAL WARNING: THE MODEL IS WEARING CLOTHING BUT YOU MUST IGNORE IT COMPLETELY! 🚨🚨
+    
     Create a detailed Gen4 Image model prompt based on this original user input: "${originalPrompt}"
+    
+    ⚠️ IMPORTANT: You will see two images:
+    1. A MODEL (@TAK) wearing some outfit - COMPLETELY IGNORE what they're wearing
+    2. A PRODUCT (@TOK) - This is the NEW clothing you must describe in detail
+    
+    🚫 FORBIDDEN: Describing ANY clothing visible on the model
+    ✅ REQUIRED: Describing ONLY the product clothing
     
     ${settingsPromptSection}
     
@@ -660,44 +658,60 @@ async function enhancePromptWithGemini(
     🎯 GEN4 IMAGE MODEL REQUIREMENTS:
     You will create a prompt for the Gen4 Image model that uses reference tags and images.
     
-    REFERENCE SYSTEM:
-    - @TUK = The face/head (from the first reference image)
-    - @TAK = The model/body (from the second reference image)
-    - @TOK = The clothing/product (from the third reference image)
+                REFERENCE SYSTEM:
+      - @TAK = The model/body (from the second reference image) - BODY/POSE REFERENCE ONLY - IGNORE ALL CLOTHING ON THIS MODEL
+      - @TOK = The clothing/product (from the third reference image) - THIS IS THE NEW CLOTHING TO BE DESCRIBED
+      
+      🚨🚨 CRITICAL INSTRUCTIONS FOR GEN4 IMAGE 🚨🚨:
+      
+      ⚠️ EXTREMELY IMPORTANT: THE @TAK MODEL IS WEARING SOME CLOTHING BUT YOU MUST COMPLETELY IGNORE IT!
+      
+      - @TAK IMAGE: Shows a person - USE ONLY for body type, pose, and stance
+      - @TOK IMAGE: Shows the NEW clothing/product that you MUST describe in detail
+      - The @TAK model's current outfit is IRRELEVANT and must NOT be mentioned
+      - 🚫 NEVER describe leopard print, dresses, or any clothing visible on @TAK model
+      - 🚫 NEVER mention the model's existing outfit, regardless of what it looks like
+      - ✅ ONLY describe the @TOK product/clothing in extreme detail
+      - ✅ The @TOK clothing is completely different from what @TAK is wearing
+      - Focus: @TAK body type/pose wearing @TOK new product (not current outfit)
     
-    🚨 CRITICAL INSTRUCTIONS FOR GEN4 IMAGE 🚨:
-    - Use @TUK to reference the face/head features
-    - Use @TAK to reference the person's body type, pose, and physical characteristics
-    - Use @TOK to reference the clothing/product that will be worn
-    - Create a prompt that shows @TUK's face on @TAK's body wearing @TOK
-    - NEVER describe the original clothing on @TAK
-    - Focus on combining @TUK face + @TAK body + @TOK clothing
-    
-    🎯 PROMPT STRUCTURE: Create a detailed sentence using @TUK, @TAK and @TOK tags with clothing descriptions.
+        🎯 PROMPT STRUCTURE: Create a detailed 800-1000 character sentence using @TAK and @TOK tags.
     
     CORE REQUIREMENTS FOR GEN4 IMAGE:
-    1. USE @TUK for the face/head
-    2. USE @TAK for the body/pose
-    3. USE @TOK for the clothing with detailed descriptions
-    4. Include clothing details, colors, textures, style
-    5. Maximum 1000 characters
+    1. USE @TAK for the body/pose reference
+    2. USE @TOK for the NEW clothing to be worn
+    3. TARGET LENGTH: 800-1000 characters (detailed description)
+    4. NEVER describe @TAK's current clothing - only reference body/pose
     
     EXAMPLE FORMAT:
-    "@TUK face on @TAK body wearing @TOK (detailed clothing description with colors, style, materials), portrait style with natural lighting in appropriate setting"
+    "@TAK body wearing @TOK [extensive detailed description of the new clothing including colors, materials, textures, cut, style, design elements, fit, silhouette, fabric details, construction, seasonal appropriateness, styling elements], photographed in [detailed lighting and setting description with mood, atmosphere, and professional photography style]"
     
-    DETAILED GUIDELINES:
-    - Keep it under 1000 characters
-    - Use @TUK, @TAK and @TOK tags
-    - Describe the clothing in detail (colors, style, material, cut)
-    - Include scene, lighting, and mood details
-    - Make it fashion-focused and descriptive
+    DETAILED EXAMPLE (Single Item):
+    "@TAK body wearing @TOK luxurious cashmere blend sweater in soft dusty rose color with intricate cable-knit pattern, featuring a relaxed oversized fit with dropped shoulders, ribbed crew neckline, and subtly textured knit construction that catches light beautifully, paired with the sweater's premium wool blend offering exceptional drape and movement, complemented by delicate mother-of-pearl buttons along the side seam and fine merino wool blend that provides both warmth and breathability, perfectly suited for transitional seasons, photographed in warm golden hour lighting with soft shadows creating depth and dimension, professional fashion photography style with shallow depth of field"
     
-            DETAILED CLOTHING ANALYSIS REQUIRED:
-    - Analyze and describe the clothing from @TOK in detail
-    - Include colors, patterns, textures, fabric types
-    - Mention design elements: buttons, zippers, cuts, silhouettes
-    - Describe style category (casual, formal, trendy, etc.)
-    - Note any unique features or embellishments
+    DETAILED EXAMPLE (Multiple Items):
+    "@TAK body wearing @TOK coordinated outfit ensemble featuring a soft coral striped knit sweater with cream and orange horizontal stripes, ribbed crew neckline and relaxed fit construction in premium cotton blend, paired with high-waisted navy blue and white vertical pinstripe wide-leg trousers with tailored silhouette and flowing drape, complemented by delicate gold charm bracelet with intricate detailing, classic tortoiseshell sunglasses with gradient lenses, and soft pink leather structured handbag with gold hardware, creating a cohesive spring-summer look that balances casual comfort with refined sophistication, photographed in the original background setting with natural lighting"
+    
+    🚨 WRONG EXAMPLE (WHAT NOT TO DO):
+    "@TAK body wearing @TOK leopard print midi dress..." ← THIS IS WRONG! This describes @TAK's current outfit, not @TOK product
+    
+    🚨 CORRECT MINDSET:
+    - If @TAK shows a woman in a leopard dress, IGNORE the leopard dress completely
+    - If @TOK shows a pink sweater, describe ONLY the pink sweater in detail
+    - Think: "@TAK body type wearing @TOK [new product details]"
+    
+    CRITICAL CLOTHING ANALYSIS RULES:
+    🚫 DO NOT describe any clothing currently on @TAK model
+    🚫 DO NOT mention @TAK's existing outfit, dress, shirt, pants, etc.
+    ✅ ONLY describe the @TOK clothing in extreme detail
+    ✅ DESCRIBE EVERY SINGLE ITEM visible in @TOK image (multiple products if present)
+    ✅ If @TOK shows multiple items: describe each one with specific details
+    ✅ Include: colors, patterns, textures, fabric types, weave, finish
+    ✅ Mention: design elements, buttons, zippers, cuts, silhouettes, fit
+    ✅ Describe: style category, seasonal use, occasion appropriateness
+    ✅ Note: unique features, embellishments, construction details, drape
+    ✅ Include: how the fabric moves, catches light, styling versatility
+    ✅ For outfit combinations: describe how items work together as a cohesive look
     
     ADDITIONAL SCENE DETAILS FOR GEN4 IMAGE:
     - Include specific lighting descriptions (natural, studio, golden hour, etc.)
@@ -748,47 +762,63 @@ async function enhancePromptWithGemini(
     - Maintain editorial magazine sophistication
     
     OUTPUT FORMAT FOR GEN4 IMAGE:
-    Create a single, detailed sentence that uses @TUK, @TAK and @TOK tags to describe the scene. Write it as if you're describing a professional photo shoot${
-      !hasLocation ? ", including the beautiful setting and lighting" : ""
+    Create a single, extensive detailed sentence that uses @TAK and @TOK tags to describe the scene. Write it as if you're describing a professional fashion photo shoot${
+      !hasLocation ? ", keeping the original background from @TAK model" : ""
     }${
       hasValidSettings
         ? ". Naturally incorporate the user's style preferences"
         : ""
     }.
     
-    🚨 CRITICAL REQUIREMENT: The prompt MUST be under 1000 characters total. Include detailed clothing descriptions.
+    🚨 CRITICAL REQUIREMENTS:
+    - TARGET LENGTH: 800-1000 characters (detailed fashion description)
+    - NEVER mention @TAK's current clothing - only body/pose reference
+    - EXTENSIVELY describe @TOK clothing: materials, colors, textures, construction, fit, style, details
+    - DESCRIBE EVERY SINGLE ITEM visible in @TOK image (if multiple items present)
+    - Include professional photography elements: lighting, setting, mood, composition
+    - ${
+      !hasLocation
+        ? "KEEP the original background from @TAK model unchanged"
+        : "Use the specified location setting"
+    }
     
-    🚨 FINAL REMINDER: Output should be a single, DETAILED Gen4 Image prompt sentence using @TUK (face), @TAK (body) and @TOK (clothing with details) tags. Maximum 1000 characters!
+    🚨 FINAL REMINDER: Output should be a single, EXTENSIVELY DETAILED Gen4 Image prompt sentence using @TAK (body reference only) and @TOK (new clothing with complete details) tags. Target 800-1000 characters!
+    
+    🚨🚨 LAST CRITICAL CHECK BEFORE WRITING:
+    - Look at the first image (@TAK) - ignore ALL clothing on this model, use only body/pose reference
+    - Look at the second image (@TOK) - describe EVERY SINGLE ITEM visible in detail
+    - The @TAK model's outfit is NOT what you should describe
+    - The @TOK product(s) are what you MUST describe (if multiple items, describe each one)
+    - For background: ${
+      !hasLocation
+        ? "keep the original background from @TAK unchanged"
+        : "use the specified location"
+    }
+    - Think: "Model body wearing NEW product(s) (not current outfit) in original/specified background"
     `;
 
+    console.log(
+      "🚨 [BACKEND GEMINI] UYARI: Model üstündeki kıyafet görmezden gelinecek!"
+    );
+    console.log(
+      "🚨 [BACKEND GEMINI] UYARI: Product görselindeki HER ÜRÜN detaylı tanımlanacak!"
+    );
+    console.log(
+      "🚨 [BACKEND GEMINI] UYARI: Orijinal arkaplan korunacak (location yoksa)!"
+    );
     console.log("Gemini'ye gönderilen istek:", promptForGemini);
 
     // Resim verilerini içerecek parts dizisini hazırla
     const parts = [{ text: promptForGemini }];
 
-    // Face, Model ve Product görsellerini ayrı ayrı Gemini'ye gönder
+    // Model ve Product görsellerini ayrı ayrı Gemini'ye gönder
     try {
-      console.log(`Face görseli (TUK) Gemini'ye gönderiliyor: ${faceImageUrl}`);
       console.log(
-        `Model görseli (TAK) Gemini'ye gönderiliyor: ${modelImageUrl}`
+        `🚨 Model görseli (TAK) - SADECE VÜCİT/POZ REFERANSI: ${modelImageUrl}`
       );
       console.log(
-        `Product görseli (TOK) Gemini'ye gönderiliyor: ${productImageUrl}`
+        `✅ Product görseli (TOK) - HER ÜRÜN DETAYLI TANIM GEREKLİ: ${productImageUrl}`
       );
-
-      // Face görselini indir ve ekle
-      const faceResponse = await got(faceImageUrl, {
-        responseType: "buffer",
-      });
-      const faceBuffer = faceResponse.body;
-      const base64FaceImage = faceBuffer.toString("base64");
-
-      parts.push({
-        inlineData: {
-          mimeType: "image/jpeg",
-          data: base64FaceImage,
-        },
-      });
 
       // Model görselini indir ve ekle
       const modelResponse = await got(modelImageUrl, {
@@ -818,9 +848,7 @@ async function enhancePromptWithGemini(
         },
       });
 
-      console.log(
-        "Face, Model ve Product görselleri başarıyla Gemini'ye yüklendi"
-      );
+      console.log("Model ve Product görselleri başarıyla Gemini'ye yüklendi");
     } catch (imageError) {
       console.error(`Görsel yüklenirken hata: ${imageError.message}`);
     }
@@ -841,6 +869,25 @@ async function enhancePromptWithGemini(
       enhancedPrompt.length
     );
 
+    // Prompt içeriğini kontrol et - model kıyafetini tanımlamış mı?
+    if (
+      enhancedPrompt.includes("leopard") ||
+      enhancedPrompt.includes("midi-dress") ||
+      enhancedPrompt.includes("dress")
+    ) {
+      console.error(
+        "❌ [BACKEND GEMINI] HATA: Gemini model üstündeki kıyafeti tanımlamış!"
+      );
+      console.error(
+        "❌ [BACKEND GEMINI] Bu yanlış! Sadece product görselindeki ÜRÜNLER tanımlanmalı!"
+      );
+    } else {
+      console.log(
+        "✅ [BACKEND GEMINI] Gemini model kıyafetini tanımlamamış, doğru!"
+      );
+    }
+
+    // Prompt uzunluğunu kontrol et ve optimize et
     if (enhancedPrompt.length > 1000) {
       console.warn(
         "⚠️ [BACKEND GEMINI] PROMPT 1000 KARAKTERİ AŞIYOR! Kısaltılması gerekiyor."
@@ -849,6 +896,18 @@ async function enhancePromptWithGemini(
       const shortPrompt = enhancedPrompt.substring(0, 997) + "...";
       console.log("✂️ [BACKEND GEMINI] Kısaltılmış prompt:", shortPrompt);
       return shortPrompt;
+    } else if (enhancedPrompt.length < 800) {
+      console.warn(
+        "⚠️ [BACKEND GEMINI] PROMPT 800 KARAKTERİN ALTINDA! Çok kısa, daha detaylı olmalı."
+      );
+      console.log(
+        "📏 [BACKEND GEMINI] Kısa prompt uzunluğu:",
+        enhancedPrompt.length
+      );
+    } else {
+      console.log(
+        "✅ [BACKEND GEMINI] Prompt uzunluğu ideal aralıkta (800-1000 karakter)"
+      );
     }
 
     return enhancedPrompt;
@@ -1059,27 +1118,25 @@ router.post("/generate", async (req, res) => {
     console.log("🎛️ [BACKEND] Gelen settings parametresi:", settings);
     console.log("📝 [BACKEND] Gelen promptText:", promptText);
 
-    // İlk üç görseli al (face + model + product)
-    const faceImage = referenceImages.find((img) => img.tag === "image_1");
+    // Model ve product görsellerini al (face'i atlıyoruz)
     const modelImage = referenceImages.find((img) => img.tag === "image_2");
     const productImage = referenceImages.find((img) => img.tag === "image_3");
 
-    if (!faceImage || !modelImage || !productImage) {
+    if (!modelImage || !productImage) {
       return res.status(400).json({
         success: false,
         result: {
           message:
-            "Face görseli (image_1), model görseli (image_2) ve ürün görseli (image_3) gereklidir.",
+            "Model görseli (image_2) ve ürün görseli (image_3) gereklidir.",
         },
       });
     }
 
-    console.log("Face görseli:", faceImage.uri);
     console.log("Model görseli:", modelImage.uri);
     console.log("Ürün görseli:", productImage.uri);
 
     // Resimleri birleştirmek yerine ayrı ayrı kullan
-    console.log("Face görseli (TUK):", faceImage.uri);
+
     console.log("Model görseli (TAK):", modelImage.uri);
     console.log("Product görseli (TOK):", productImage.uri);
 
@@ -1092,7 +1149,6 @@ router.post("/generate", async (req, res) => {
     // Kullanıcının prompt'unu Gemini ile iyileştir (Gen4 image formatında)
     const enhancedPrompt = await enhancePromptWithGemini(
       promptText,
-      faceImage.uri,
       modelImage.uri,
       productImage.uri,
       settings || {}
@@ -1106,8 +1162,8 @@ router.post("/generate", async (req, res) => {
       prompt: enhancedPrompt,
       prompt_length: enhancedPrompt.length,
       aspect_ratio: formattedRatio,
-      reference_tags: ["TUK", "TAK", "TOK"],
-      reference_images: [faceImage.uri, modelImage.uri, productImage.uri],
+      reference_tags: ["TAK", "TOK"],
+      reference_images: [modelImage.uri, productImage.uri],
     });
 
     const replicateResponse = await got
@@ -1123,12 +1179,8 @@ router.post("/generate", async (req, res) => {
             input: {
               prompt: enhancedPrompt,
               aspect_ratio: formattedRatio,
-              reference_tags: ["TUK", "TAK", "TOK"],
-              reference_images: [
-                faceImage.uri,
-                modelImage.uri,
-                productImage.uri,
-              ],
+              reference_tags: ["TAK", "TOK"],
+              reference_images: [modelImage.uri, productImage.uri],
             },
           },
           responseType: "json",
