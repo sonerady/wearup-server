@@ -458,6 +458,35 @@ async function enhancePromptWithGemini(
     );
     console.log("   - hasDetails:", hasDetails, "value:", settings?.details);
 
+    // String konversiyon fonksiyonu
+    const convertToString = (value) => {
+      if (value === null || value === undefined) return null;
+      if (typeof value === "string") return value;
+      if (typeof value === "object" && value.name) return value.name;
+      if (typeof value === "object" && value.label) return value.label;
+      if (typeof value === "object" && value.title) return value.title;
+      if (typeof value === "object") return JSON.stringify(value);
+      return String(value);
+    };
+
+    // Detay temizleme fonksiyonu - tekrarları kaldır
+    const cleanDetails = (details) => {
+      if (!details) return null;
+
+      // String'e çevir
+      let cleanedDetails =
+        typeof details === "string" ? details : String(details);
+
+      // Tekrarları kaldır (aynı cümle birden fazla kez yazılmışsa)
+      const sentences = cleanedDetails
+        .split(/[.\n]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      const uniqueSentences = [...new Set(sentences)];
+
+      return uniqueSentences.join(". ");
+    };
+
     let settingsPromptSection = "";
 
     if (hasValidSettings) {
@@ -467,91 +496,117 @@ async function enhancePromptWithGemini(
 
       const settingsDescriptions = [];
 
-      // Location/Environment
+      // Location/Environment - object'i string'e çevir
       if (hasLocation) {
-        settingsDescriptions.push(`LOCATION/ENVIRONMENT: ${settings.location}`);
-        console.log("   ✅ Location eklendi:", settings.location);
+        const locationString = convertToString(settings.location);
+        settingsDescriptions.push(`LOCATION/ENVIRONMENT: ${locationString}`);
+        console.log("   ✅ Location eklendi (string):", locationString);
       }
 
-      // Weather/Season
+      // Weather/Season - object'i string'e çevir
       if (hasWeather) {
-        const weatherValue = settings.season || settings.weather;
+        const weatherValue = convertToString(
+          settings.season || settings.weather
+        );
         settingsDescriptions.push(`WEATHER/SEASON: ${weatherValue}`);
-        console.log("   ✅ Weather/Season eklendi:", weatherValue);
+        console.log("   ✅ Weather/Season eklendi (string):", weatherValue);
       }
 
-      // Product Color
+      // Product Color - object'i string'e çevir
       if (hasProductColor) {
-        settingsDescriptions.push(`PRODUCT COLOR: ${settings.productColor}`);
-        console.log("   ✅ Product Color eklendi:", settings.productColor);
+        const productColorString = convertToString(settings.productColor);
+        settingsDescriptions.push(`PRODUCT COLOR: ${productColorString}`);
+        console.log(
+          "   ✅ Product Color eklendi (string):",
+          productColorString
+        );
       }
 
-      // Demographics
+      // Demographics - object'leri string'e çevir
       if (hasAge) {
-        settingsDescriptions.push(`AGE: ${settings.age}`);
-        console.log("   ✅ Age eklendi:", settings.age);
+        const ageString = convertToString(settings.age);
+        settingsDescriptions.push(`AGE: ${ageString}`);
+        console.log("   ✅ Age eklendi (string):", ageString);
       }
 
       if (hasGender) {
-        settingsDescriptions.push(`GENDER: ${settings.gender}`);
-        console.log("   ✅ Gender eklendi:", settings.gender);
+        const genderString = convertToString(settings.gender);
+        settingsDescriptions.push(`GENDER: ${genderString}`);
+        console.log("   ✅ Gender eklendi (string):", genderString);
       }
 
       if (hasEthnicity) {
-        settingsDescriptions.push(`ETHNICITY: ${settings.ethnicity}`);
-        console.log("   ✅ Ethnicity eklendi:", settings.ethnicity);
+        const ethnicityString = convertToString(settings.ethnicity);
+        settingsDescriptions.push(`ETHNICITY: ${ethnicityString}`);
+        console.log("   ✅ Ethnicity eklendi (string):", ethnicityString);
       }
 
-      // Physical Attributes
+      // Physical Attributes - object'leri string'e çevir
       if (hasSkinTone) {
-        settingsDescriptions.push(`SKIN TONE: ${settings.skinTone}`);
-        console.log("   ✅ Skin Tone eklendi:", settings.skinTone);
+        const skinToneString = convertToString(settings.skinTone);
+        settingsDescriptions.push(`SKIN TONE: ${skinToneString}`);
+        console.log("   ✅ Skin Tone eklendi (string):", skinToneString);
       }
 
       if (hasBodyShape) {
-        settingsDescriptions.push(`BODY SHAPE: ${settings.bodyShape}`);
-        console.log("   ✅ Body Shape eklendi:", settings.bodyShape);
+        const bodyShapeString = convertToString(settings.bodyShape);
+        settingsDescriptions.push(`BODY SHAPE: ${bodyShapeString}`);
+        console.log("   ✅ Body Shape eklendi (string):", bodyShapeString);
       }
 
-      // Hair
+      // Hair - object'leri string'e çevir
       if (hasHairStyle) {
-        settingsDescriptions.push(`HAIR STYLE: ${settings.hairStyle}`);
-        console.log("   ✅ Hair Style eklendi:", settings.hairStyle);
+        const hairStyleString = convertToString(settings.hairStyle);
+        settingsDescriptions.push(`HAIR STYLE: ${hairStyleString}`);
+        console.log("   ✅ Hair Style eklendi (string):", hairStyleString);
       }
 
       if (hasHairColor) {
-        settingsDescriptions.push(`HAIR COLOR: ${settings.hairColor}`);
-        console.log("   ✅ Hair Color eklendi:", settings.hairColor);
+        const hairColorString = convertToString(settings.hairColor);
+        settingsDescriptions.push(`HAIR COLOR: ${hairColorString}`);
+        console.log("   ✅ Hair Color eklendi (string):", hairColorString);
       }
 
-      // Style & Mood
+      // Style & Mood - object'i string'e çevir
       if (hasMood) {
-        settingsDescriptions.push(`MOOD/EXPRESSION: ${settings.mood}`);
-        console.log("   ✅ Mood eklendi:", settings.mood);
+        const moodString = convertToString(settings.mood);
+        settingsDescriptions.push(`MOOD/EXPRESSION: ${moodString}`);
+        console.log("   ✅ Mood eklendi (string):", moodString);
       }
 
       if (hasPerspective) {
-        settingsDescriptions.push(
-          `CAMERA PERSPECTIVE: ${settings.perspective}`
-        );
-        console.log("   ✅ Perspective eklendi:", settings.perspective);
+        const perspectiveString = convertToString(settings.perspective);
+        settingsDescriptions.push(`CAMERA PERSPECTIVE: ${perspectiveString}`);
+        console.log("   ✅ Perspective eklendi (string):", perspectiveString);
       }
 
       if (hasPose) {
-        settingsDescriptions.push(`POSE: ${settings.pose}`);
-        console.log("   ✅ Pose eklendi:", settings.pose);
+        const poseString = convertToString(settings.pose);
+        settingsDescriptions.push(`POSE: ${poseString}`);
+        console.log("   ✅ Pose eklendi (string):", poseString);
       }
 
-      // Accessories
+      // Accessories - object'i string'e çevir
       if (hasAccessories) {
-        settingsDescriptions.push(`ACCESSORIES: ${settings.accessories}`);
-        console.log("   ✅ Accessories eklendi:", settings.accessories);
+        const accessoriesString = convertToString(settings.accessories);
+        settingsDescriptions.push(`ACCESSORIES: ${accessoriesString}`);
+        console.log("   ✅ Accessories eklendi (string):", accessoriesString);
       }
 
-      // Custom Details
+      // Custom Details - tekrarları temizle
       if (hasDetails) {
-        settingsDescriptions.push(`ADDITIONAL DETAILS: ${settings.details}`);
-        console.log("   ✅ Custom Details eklendi:", settings.details);
+        const cleanedDetailsText = cleanDetails(settings.details);
+        if (cleanedDetailsText && cleanedDetailsText.trim() !== "") {
+          settingsDescriptions.push(
+            `ADDITIONAL DETAILS: ${cleanedDetailsText}`
+          );
+          console.log(
+            "   ✅ Custom Details eklendi (temizlenmiş):",
+            cleanedDetailsText
+          );
+        } else {
+          console.log("   ⚠️ Custom Details boş veya geçersiz, atlanıyor");
+        }
       }
 
       if (settingsDescriptions.length > 0) {
@@ -607,9 +662,13 @@ async function enhancePromptWithGemini(
     - Apply additional details for extra customization
     - Ensure all settings work harmoniously together for a cohesive look`;
 
+        console.log("📝 [BACKEND GEMINI] Settings descriptions hazırlandı:");
+        settingsDescriptions.forEach((desc, index) => {
+          console.log(`   ${index + 1}. ${desc}`);
+        });
         console.log(
-          "📝 [BACKEND GEMINI] Settings descriptions hazırlandı:",
-          settingsDescriptions
+          "📝 [BACKEND GEMINI] Toplam settings count:",
+          settingsDescriptions.length
         );
       } else {
         console.log("⚠️ [BACKEND GEMINI] Hiçbir geçerli setting bulunamadı");
