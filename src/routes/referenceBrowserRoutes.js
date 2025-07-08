@@ -342,10 +342,12 @@ function formatAspectRatio(ratioStr) {
   }
 }
 
-// Prompt'u iyileştirmek için Gemini'yi kullan
+// Prompt'u iyileştirmek için Gemini'yi kullan (Gen4 Image formatında)
 async function enhancePromptWithGemini(
   originalPrompt,
-  combinedImageUrl,
+  faceImageUrl,
+  modelImageUrl,
+  productImageUrl,
   settings = {}
 ) {
   try {
@@ -647,54 +649,68 @@ async function enhancePromptWithGemini(
     8. Ensure lighting and atmosphere match the location and complement the overall look`;
     }
 
-    // Gemini'ye gönderilecek metin
+    // Gemini'ye gönderilecek metin (Gen4 Image formatında)
     let promptForGemini = `
-    Create a detailed, professional fashion photography description based on this original user input: "${originalPrompt}"
+    Create a detailed Gen4 Image model prompt based on this original user input: "${originalPrompt}"
     
     ${settingsPromptSection}
     
     ${backgroundPromptSection}
     
-    You are looking at a combined image showing:
-    - LEFT SIDE: A person with specific body type, pose, and physical characteristics
-    - RIGHT SIDE: Fashion clothing/accessories/products that should be styled on the person
+    🎯 GEN4 IMAGE MODEL REQUIREMENTS:
+    You will create a prompt for the Gen4 Image model that uses reference tags and images.
     
-    🚨 CRITICAL REPLACEMENT INSTRUCTION 🚨:
-    - COMPLETELY IGNORE AND DO NOT MENTION ANY CLOTHING that the LEFT person is currently wearing
-    - The LEFT person's existing clothes/outfits MUST BE REPLACED with the RIGHT side products
-    - ONLY describe the person's body, pose, facial features, and physical characteristics from the LEFT side
-    - NEVER describe or reference the original clothing on the LEFT person
-    - The RIGHT side products will REPLACE whatever the LEFT person is wearing
+    REFERENCE SYSTEM:
+    - @TUK = The face/head (from the first reference image)
+    - @TAK = The model/body (from the second reference image)
+    - @TOK = The clothing/product (from the third reference image)
     
-    🎯 REPLACEMENT TASK: Create a comprehensive fashion photography description where the person from the LEFT is wearing ONLY the clothing/products from the RIGHT side, completely replacing their original outfit.
+    🚨 CRITICAL INSTRUCTIONS FOR GEN4 IMAGE 🚨:
+    - Use @TUK to reference the face/head features
+    - Use @TAK to reference the person's body type, pose, and physical characteristics
+    - Use @TOK to reference the clothing/product that will be worn
+    - Create a prompt that shows @TUK's face on @TAK's body wearing @TOK
+    - NEVER describe the original clothing on @TAK
+    - Focus on combining @TUK face + @TAK body + @TOK clothing
     
-    CORE REQUIREMENTS:
-    1. PERSON CHARACTERISTICS: Describe the person from the LEFT side - their body type, height, build, posture, pose, and facial features (🚨 ABSOLUTELY IGNORE THEIR CURRENT CLOTHING 🚨)
-    2. REPLACEMENT CLOTHING DETAILS: Describe in EXTREME DETAIL ONLY the clothing/products from the RIGHT side that will REPLACE the original outfit:
-       - Exact colors, patterns, textures, fabrics, materials
-       - Specific cuts, silhouettes, design elements
-       - Unique features, embellishments, details, finishes
-       - How each garment fits and drapes on this specific person's body
-       - Material characteristics (matte, glossy, textured, smooth, etc.)
-    3. REPLACEMENT STYLING: Show how the RIGHT side products look when they REPLACE the original outfit on the LEFT side person
-    4. COMPLETE OUTFIT REPLACEMENT: Create a seamless look where all clothing items from the RIGHT side completely replace the original clothing and work together harmoniously
+    🎯 PROMPT STRUCTURE: Create a detailed sentence using @TUK, @TAK and @TOK tags with clothing descriptions.
     
-    DETAILED PRODUCT ANALYSIS REQUIRED (REPLACEMENT FOCUS):
-    - Analyze EVERY visible clothing item and accessory from the RIGHT side ONLY - these will REPLACE the original outfit
-    - 🚨 STRICTLY FORBIDDEN: DO NOT mention, describe, or reference ANY clothing visible on the LEFT side person 🚨
-    - Describe fabric textures, weaves, finishes in detail for the REPLACEMENT clothing
-    - Mention specific design elements of REPLACEMENT items: buttons, zippers, seams, cuts, patterns
-    - Describe how each REPLACEMENT piece fits this particular body type and height
-    - Include color descriptions with nuances and undertones for the NEW outfit
-    - Mention any logos, prints, or decorative elements on the REPLACEMENT clothing (but avoid brand names)
-    - Describe the overall style aesthetic and fashion category of the COMPLETE NEW OUTFIT
+    CORE REQUIREMENTS FOR GEN4 IMAGE:
+    1. USE @TUK for the face/head
+    2. USE @TAK for the body/pose
+    3. USE @TOK for the clothing with detailed descriptions
+    4. Include clothing details, colors, textures, style
+    5. Maximum 1000 characters
     
-    BODY & STYLING INTEGRATION (REPLACEMENT OUTCOME):
-    - How the RIGHT side REPLACEMENT clothing complements the person's body proportions
-    - How the NEW outfit's fit enhances their natural silhouette
-    - How the REPLACEMENT clothing colors work with their overall appearance
-    - How the NEW style matches their pose and attitude
-    - The transformation from original outfit to the NEW REPLACEMENT outfit
+    EXAMPLE FORMAT:
+    "@TUK face on @TAK body wearing @TOK (detailed clothing description with colors, style, materials), portrait style with natural lighting in appropriate setting"
+    
+    DETAILED GUIDELINES:
+    - Keep it under 1000 characters
+    - Use @TUK, @TAK and @TOK tags
+    - Describe the clothing in detail (colors, style, material, cut)
+    - Include scene, lighting, and mood details
+    - Make it fashion-focused and descriptive
+    
+            DETAILED CLOTHING ANALYSIS REQUIRED:
+    - Analyze and describe the clothing from @TOK in detail
+    - Include colors, patterns, textures, fabric types
+    - Mention design elements: buttons, zippers, cuts, silhouettes
+    - Describe style category (casual, formal, trendy, etc.)
+    - Note any unique features or embellishments
+    
+    ADDITIONAL SCENE DETAILS FOR GEN4 IMAGE:
+    - Include specific lighting descriptions (natural, studio, golden hour, etc.)
+    - Add camera angle/perspective details (close-up, full body, portrait, etc.)
+    - Mention background/setting that complements the style
+    - Include mood and atmosphere descriptions
+    - Add any relevant props or environmental elements
+    
+    SETTINGS INTEGRATION:
+    - Incorporate user settings naturally into the prompt
+    - Use location settings for background details
+    - Use mood settings for expression and atmosphere
+    - Use color settings for styling choices
     
     ${
       hasProductColor
@@ -731,18 +747,18 @@ async function enhancePromptWithGemini(
     - Focus on fabric quality, construction, and styling rather than body emphasis
     - Maintain editorial magazine sophistication
     
-    OUTPUT FORMAT:
-    Create a single, flowing fashion photography description that reads like a professional editorial caption. Describe the COMPLETE REPLACEMENT OUTFIT as if you're writing for a high-end fashion magazine${
-      !hasLocation
-        ? ", including the beautiful setting and lighting that creates the perfect fashion photography atmosphere"
-        : ""
+    OUTPUT FORMAT FOR GEN4 IMAGE:
+    Create a single, detailed sentence that uses @TUK, @TAK and @TOK tags to describe the scene. Write it as if you're describing a professional photo shoot${
+      !hasLocation ? ", including the beautiful setting and lighting" : ""
     }${
       hasValidSettings
-        ? ". Naturally incorporate the user's style preferences into the description"
+        ? ". Naturally incorporate the user's style preferences"
         : ""
     }.
     
-    🚨 FINAL REMINDER: The description should show the person wearing ONLY the RIGHT side products, completely replacing their original clothing. This should read like a beautiful, detailed fashion photography description of the NEW OUTFIT, not the original clothing or a technical process explanation.
+    🚨 CRITICAL REQUIREMENT: The prompt MUST be under 1000 characters total. Include detailed clothing descriptions.
+    
+    🚨 FINAL REMINDER: Output should be a single, DETAILED Gen4 Image prompt sentence using @TUK (face), @TAK (body) and @TOK (clothing with details) tags. Maximum 1000 characters!
     `;
 
     console.log("Gemini'ye gönderilen istek:", promptForGemini);
@@ -750,28 +766,61 @@ async function enhancePromptWithGemini(
     // Resim verilerini içerecek parts dizisini hazırla
     const parts = [{ text: promptForGemini }];
 
-    // Birleştirilmiş görseli Gemini'ye gönder
+    // Face, Model ve Product görsellerini ayrı ayrı Gemini'ye gönder
     try {
+      console.log(`Face görseli (TUK) Gemini'ye gönderiliyor: ${faceImageUrl}`);
       console.log(
-        `Birleştirilmiş görsel Gemini'ye gönderiliyor: ${combinedImageUrl}`
+        `Model görseli (TAK) Gemini'ye gönderiliyor: ${modelImageUrl}`
+      );
+      console.log(
+        `Product görseli (TOK) Gemini'ye gönderiliyor: ${productImageUrl}`
       );
 
-      const imageResponse = await got(combinedImageUrl, {
+      // Face görselini indir ve ekle
+      const faceResponse = await got(faceImageUrl, {
         responseType: "buffer",
       });
-      const imageBuffer = imageResponse.body;
-
-      // Base64'e çevir
-      const base64Image = imageBuffer.toString("base64");
+      const faceBuffer = faceResponse.body;
+      const base64FaceImage = faceBuffer.toString("base64");
 
       parts.push({
         inlineData: {
           mimeType: "image/jpeg",
-          data: base64Image,
+          data: base64FaceImage,
         },
       });
 
-      console.log("Birleştirilmiş görsel başarıyla Gemini'ye yüklendi");
+      // Model görselini indir ve ekle
+      const modelResponse = await got(modelImageUrl, {
+        responseType: "buffer",
+      });
+      const modelBuffer = modelResponse.body;
+      const base64ModelImage = modelBuffer.toString("base64");
+
+      parts.push({
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: base64ModelImage,
+        },
+      });
+
+      // Product görselini indir ve ekle
+      const productResponse = await got(productImageUrl, {
+        responseType: "buffer",
+      });
+      const productBuffer = productResponse.body;
+      const base64ProductImage = productBuffer.toString("base64");
+
+      parts.push({
+        inlineData: {
+          mimeType: "image/jpeg",
+          data: base64ProductImage,
+        },
+      });
+
+      console.log(
+        "Face, Model ve Product görselleri başarıyla Gemini'ye yüklendi"
+      );
     } catch (imageError) {
       console.error(`Görsel yüklenirken hata: ${imageError.message}`);
     }
@@ -787,6 +836,20 @@ async function enhancePromptWithGemini(
       "🤖 [BACKEND GEMINI] Gemini'nin ürettiği prompt:",
       enhancedPrompt
     );
+    console.log(
+      "📏 [BACKEND GEMINI] Prompt karakter sayısı:",
+      enhancedPrompt.length
+    );
+
+    if (enhancedPrompt.length > 1000) {
+      console.warn(
+        "⚠️ [BACKEND GEMINI] PROMPT 1000 KARAKTERİ AŞIYOR! Kısaltılması gerekiyor."
+      );
+      // Prompt'u kısalt
+      const shortPrompt = enhancedPrompt.substring(0, 997) + "...";
+      console.log("✂️ [BACKEND GEMINI] Kısaltılmış prompt:", shortPrompt);
+      return shortPrompt;
+    }
 
     return enhancedPrompt;
   } catch (error) {
@@ -886,142 +949,6 @@ async function pollReplicateResult(predictionId, maxAttempts = 60) {
   }
 
   throw new Error("Replicate işlemi zaman aşımına uğradı");
-}
-
-// Face-swap işlemini retry mekanizması ile yapan fonksiyon
-async function performFaceSwapWithRetry(
-  faceImageUrl,
-  fluxOutputUrl,
-  userId,
-  maxRetries = 3
-) {
-  console.log(`🔄 Face-swap işlemi başlatılıyor (max ${maxRetries} deneme)...`);
-  console.log("👤 Face image:", faceImageUrl);
-  console.log("🎨 Flux output:", fluxOutputUrl);
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`🔄 Face-swap deneme ${attempt}/${maxRetries}...`);
-
-      // Face-swap API'sine istek gönder
-      const faceSwapResponse = await got.post(
-        "https://api.replicate.com/v1/predictions",
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
-            "Content-Type": "application/json",
-          },
-          json: {
-            version:
-              "cdingram/face-swap:d1d6ea8c8be89d664a07a457526f7128109dee7030fdac424788d762c71ed111",
-            input: {
-              swap_image: faceImageUrl, // Face fotoğrafı
-              input_image: fluxOutputUrl, // Flux-kontext sonucu
-            },
-          },
-          responseType: "json",
-        }
-      );
-
-      const faceSwapInitial = faceSwapResponse.body;
-      console.log(
-        `Face-swap API başlangıç yanıtı (deneme ${attempt}):`,
-        faceSwapInitial
-      );
-
-      if (!faceSwapInitial.id) {
-        console.error(
-          `Face-swap prediction ID alınamadı (deneme ${attempt}):`,
-          faceSwapInitial
-        );
-
-        if (attempt === maxRetries) {
-          throw new Error("Face-swap başlatılamadı - tüm denemeler tükendi");
-        }
-
-        console.log(
-          `⏳ 3 saniye bekleyip tekrar deneniyor (deneme ${attempt + 1})...`
-        );
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        continue;
-      }
-
-      // Face-swap prediction durumunu polling ile takip et
-      console.log(
-        `🔄 Face-swap polling başlatılıyor (deneme ${attempt}): ${faceSwapInitial.id}`
-      );
-      const faceSwapResult = await pollReplicateResult(faceSwapInitial.id);
-
-      console.log(
-        `Face-swap final result (deneme ${attempt}):`,
-        faceSwapResult
-      );
-
-      if (faceSwapResult.status === "succeeded" && faceSwapResult.output) {
-        console.log(`✅ Face-swap API işlemi başarılı (deneme ${attempt})`);
-        return {
-          success: true,
-          result: faceSwapResult,
-        };
-      } else {
-        console.error(
-          `Face-swap API başarısız (deneme ${attempt}):`,
-          faceSwapResult
-        );
-
-        if (attempt === maxRetries) {
-          throw new Error(
-            faceSwapResult.error ||
-              "Face-swap işlemi başarısız - tüm denemeler tükendi"
-          );
-        }
-
-        console.log(
-          `⏳ 3 saniye bekleyip tekrar deneniyor (deneme ${attempt + 1})...`
-        );
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        continue;
-      }
-    } catch (error) {
-      console.error(`❌ Face-swap deneme ${attempt} hatası:`, error.message);
-
-      // Ağ bağlantısı hatalarını kontrol et
-      const isNetworkError =
-        error.message.includes("Network is unreachable") ||
-        error.message.includes("HTTPSConnectionPool") ||
-        error.message.includes("Max retries exceeded") ||
-        error.message.includes("Connection") ||
-        error.message.includes("ECONNRESET") ||
-        error.message.includes("ENOTFOUND") ||
-        error.message.includes("ETIMEDOUT");
-
-      if (isNetworkError && attempt < maxRetries) {
-        console.log(
-          `🔄 Ağ hatası tespit edildi, ${3} saniye bekleyip tekrar deneniyor (deneme ${
-            attempt + 1
-          })...`
-        );
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-        continue;
-      }
-
-      // Son deneme veya ağ hatası değilse hata fırlat
-      if (attempt === maxRetries) {
-        console.error(
-          `❌ Face-swap tüm denemeler başarısız oldu: ${error.message}`
-        );
-        throw error;
-      }
-
-      // Diğer hatalar için de tekrar dene
-      console.log(
-        `⏳ 3 saniye bekleyip tekrar deneniyor (deneme ${attempt + 1})...`
-      );
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-    }
-  }
-
-  throw new Error("Face-swap işlemi başarısız - tüm denemeler tükendi");
 }
 
 // Ana generate endpoint'i
@@ -1151,16 +1078,10 @@ router.post("/generate", async (req, res) => {
     console.log("Model görseli:", modelImage.uri);
     console.log("Ürün görseli:", productImage.uri);
 
-    // Sadece model + product birleştir (hem Gemini hem Flux için)
-    const combinedImageUrl = await combineModelAndProduct(
-      modelImage.uri,
-      productImage.uri
-    );
-
-    console.log(
-      "Model + Product birleştirilmiş görsel URL'si:",
-      combinedImageUrl
-    );
+    // Resimleri birleştirmek yerine ayrı ayrı kullan
+    console.log("Face görseli (TUK):", faceImage.uri);
+    console.log("Model görseli (TAK):", modelImage.uri);
+    console.log("Product görseli (TOK):", productImage.uri);
 
     // Aspect ratio'yu formatla
     const formattedRatio = formatAspectRatio(ratio || "9:16");
@@ -1168,34 +1089,60 @@ router.post("/generate", async (req, res) => {
       `İstenen ratio: ${ratio}, formatlanmış ratio: ${formattedRatio}`
     );
 
-    // Kullanıcının prompt'unu Gemini ile iyileştir (3 görsel birleşimini kullan)
+    // Kullanıcının prompt'unu Gemini ile iyileştir (Gen4 image formatında)
     const enhancedPrompt = await enhancePromptWithGemini(
       promptText,
-      combinedImageUrl,
+      faceImage.uri,
+      modelImage.uri,
+      productImage.uri,
       settings || {}
     );
 
     console.log("📝 [BACKEND MAIN] Original prompt:", promptText);
     console.log("✨ [BACKEND MAIN] Enhanced prompt:", enhancedPrompt);
 
-    // Replicate API'ye istek gönder - sadece model + product görseli kullan
-    const replicateResponse = await got.post(
-      "https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-max/predictions",
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        json: {
-          input: {
-            prompt: enhancedPrompt,
-            input_image: combinedImageUrl, // Face olmadan sadece model + product
-            aspect_ratio: formattedRatio,
+    // Replicate API'ye istek gönder - Gen4 Image modeli kullan
+    console.log("🔧 Gen4 Image API parametreleri:", {
+      prompt: enhancedPrompt,
+      prompt_length: enhancedPrompt.length,
+      aspect_ratio: formattedRatio,
+      reference_tags: ["TUK", "TAK", "TOK"],
+      reference_images: [faceImage.uri, modelImage.uri, productImage.uri],
+    });
+
+    const replicateResponse = await got
+      .post(
+        "https://api.replicate.com/v1/models/runwayml/gen4-image/predictions",
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
+            "Content-Type": "application/json",
+            Prefer: "wait",
           },
-        },
-        responseType: "json",
-      }
-    );
+          json: {
+            input: {
+              prompt: enhancedPrompt,
+              aspect_ratio: formattedRatio,
+              reference_tags: ["TUK", "TAK", "TOK"],
+              reference_images: [
+                faceImage.uri,
+                modelImage.uri,
+                productImage.uri,
+              ],
+            },
+          },
+          responseType: "json",
+        }
+      )
+      .catch((error) => {
+        console.error(
+          "❌ Gen4 Image API detaylı hatası:",
+          error.response?.body || error.message
+        );
+        console.error("❌ Error status:", error.response?.statusCode);
+        console.error("❌ Error headers:", error.response?.headers);
+        throw error;
+      });
 
     const initialResult = replicateResponse.body;
     console.log("Replicate API başlangıç yanıtı:", initialResult);
@@ -1245,170 +1192,43 @@ router.post("/generate", async (req, res) => {
     if (finalResult.status === "succeeded" && finalResult.output) {
       console.log("Replicate API işlemi başarılı");
 
-      // Face-swap işlemi için face fotoğrafını al
-      const faceImageUrl = faceImage.uri;
-      const fluxOutputUrl = finalResult.output;
+      // 💳 API başarılı olduktan sonra güncel kredi bilgisini al
+      let currentCredit = null;
+      if (userId && userId !== "anonymous_user") {
+        try {
+          const { data: updatedUser } = await supabase
+            .from("users")
+            .select("credit_balance")
+            .eq("id", userId)
+            .single();
 
-      console.log("🔄 Face-swap işlemi başlatılıyor...");
-      console.log("👤 Face image:", faceImageUrl);
-      console.log("🎨 Flux output:", fluxOutputUrl);
-
-      try {
-        // Face-swap işlemi için retry mekanizmasını kullan
-        const faceSwapResult = await performFaceSwapWithRetry(
-          faceImageUrl,
-          fluxOutputUrl,
-          userId
-        );
-
-        if (faceSwapResult.success) {
-          console.log("✅ Face-swap API işlemi başarılı");
-
-          // 💳 API başarılı olduktan sonra güncel kredi bilgisini al (V2'den eklendi)
-          let currentCredit = null;
-          if (userId && userId !== "anonymous_user") {
-            try {
-              const { data: updatedUser } = await supabase
-                .from("users")
-                .select("credit_balance")
-                .eq("id", userId)
-                .single();
-
-              currentCredit = updatedUser?.credit_balance || 0;
-              console.log(`💳 Güncel kredi balance: ${currentCredit}`);
-            } catch (creditError) {
-              console.error("❌ Güncel kredi sorgu hatası:", creditError);
-            }
-          }
-
-          // Face-swap sonucunu client'e gönder
-          const responseData = {
-            success: true,
-            result: {
-              imageUrl: faceSwapResult.result.output, // Face-swap sonucu
-              originalPrompt: promptText,
-              enhancedPrompt: enhancedPrompt,
-              replicateData: finalResult,
-              faceSwapData: faceSwapResult.result,
-              originalFluxOutput: fluxOutputUrl, // Orijinal flux sonucunu da sakla
-              currentCredit: currentCredit, // 💳 Güncel kredi bilgisini response'a ekle
-            },
-          };
-
-          await saveGenerationToDatabase(
-            userId,
-            responseData,
-            promptText,
-            referenceImages
-          );
-
-          return res.status(200).json(responseData);
-        } else {
-          console.error("Face-swap API başarısız:", faceSwapResult.result);
-
-          // 💳 API başarılı olduktan sonra güncel kredi bilgisini al (V2'den eklendi)
-          let currentCredit = null;
-          if (userId && userId !== "anonymous_user") {
-            try {
-              const { data: updatedUser } = await supabase
-                .from("users")
-                .select("credit_balance")
-                .eq("id", userId)
-                .single();
-
-              currentCredit = updatedUser?.credit_balance || 0;
-              console.log(`💳 Güncel kredi balance: ${currentCredit}`);
-            } catch (creditError) {
-              console.error("❌ Güncel kredi sorgu hatası:", creditError);
-            }
-          }
-
-          // Face-swap başarısız olursa orijinal flux sonucunu döndür
-          const responseData = {
-            success: true,
-            result: {
-              imageUrl: fluxOutputUrl,
-              originalPrompt: promptText,
-              enhancedPrompt: enhancedPrompt,
-              replicateData: finalResult,
-              faceSwapError:
-                faceSwapResult.result.error ||
-                "Face-swap işlemi başarısız, orijinal sonuç döndürülüyor",
-              currentCredit: currentCredit, // 💳 Güncel kredi bilgisini response'a ekle
-            },
-          };
-
-          await saveGenerationToDatabase(
-            userId,
-            responseData,
-            promptText,
-            referenceImages
-          );
-
-          return res.status(200).json(responseData);
+          currentCredit = updatedUser?.credit_balance || 0;
+          console.log(`💳 Güncel kredi balance: ${currentCredit}`);
+        } catch (creditError) {
+          console.error("❌ Güncel kredi sorgu hatası:", creditError);
         }
-      } catch (faceSwapError) {
-        console.error("Face-swap API hatası:", faceSwapError);
-
-        // Ağ bağlantısı hatalarını kontrol et
-        const isNetworkError =
-          faceSwapError.message.includes("Network is unreachable") ||
-          faceSwapError.message.includes("HTTPSConnectionPool") ||
-          faceSwapError.message.includes("Max retries exceeded") ||
-          faceSwapError.message.includes("Connection") ||
-          faceSwapError.message.includes("ECONNRESET") ||
-          faceSwapError.message.includes("ENOTFOUND") ||
-          faceSwapError.message.includes("ETIMEDOUT");
-
-        let errorMessage = `Face-swap hatası: ${faceSwapError.message}`;
-
-        if (isNetworkError) {
-          errorMessage =
-            "Face-swap işlemi ağ bağlantısı sorunu nedeniyle 3 kez denendi ancak başarısız oldu. Orijinal sonuç döndürülüyor.";
-        } else if (faceSwapError.message.includes("tüm denemeler tükendi")) {
-          errorMessage =
-            "Face-swap işlemi 3 kez denendi ancak başarısız oldu. Orijinal sonuç döndürülüyor.";
-        }
-
-        // 💳 API başarılı olduktan sonra güncel kredi bilgisini al (V2'den eklendi)
-        let currentCredit = null;
-        if (userId && userId !== "anonymous_user") {
-          try {
-            const { data: updatedUser } = await supabase
-              .from("users")
-              .select("credit_balance")
-              .eq("id", userId)
-              .single();
-
-            currentCredit = updatedUser?.credit_balance || 0;
-            console.log(`💳 Güncel kredi balance: ${currentCredit}`);
-          } catch (creditError) {
-            console.error("❌ Güncel kredi sorgu hatası:", creditError);
-          }
-        }
-
-        // Face-swap hatası olursa orijinal flux sonucunu döndür
-        const responseData = {
-          success: true,
-          result: {
-            imageUrl: fluxOutputUrl,
-            originalPrompt: promptText,
-            enhancedPrompt: enhancedPrompt,
-            replicateData: finalResult,
-            faceSwapError: errorMessage,
-            currentCredit: currentCredit, // 💳 Güncel kredi bilgisini response'a ekle
-          },
-        };
-
-        await saveGenerationToDatabase(
-          userId,
-          responseData,
-          promptText,
-          referenceImages
-        );
-
-        return res.status(200).json(responseData);
       }
+
+      // Direkt sonucu client'e gönder
+      const responseData = {
+        success: true,
+        result: {
+          imageUrl: finalResult.output,
+          originalPrompt: promptText,
+          enhancedPrompt: enhancedPrompt,
+          replicateData: finalResult,
+          currentCredit: currentCredit,
+        },
+      };
+
+      await saveGenerationToDatabase(
+        userId,
+        responseData,
+        promptText,
+        referenceImages
+      );
+
+      return res.status(200).json(responseData);
     } else {
       console.error("Replicate API başarısız:", finalResult);
 
