@@ -692,9 +692,12 @@ async function enhancePromptWithGemini(
       backgroundPromptSection = `
     
     BACKGROUND NOTE (User specified location settings):
-    6. USER HAS SPECIFIED LOCATION: "${settings.location}" - Use this location for the background
-    7. Focus on making the specified location look professional and photogenic
-    8. Ensure lighting and atmosphere match the location and complement the overall look`;
+    6. USER HAS SPECIFIED LOCATION: "${settings.location}" - EXPAND this into a detailed, atmospheric description
+    7. DON'T just write "${settings.location}" - describe the environment in cinematic detail
+    8. Example: "desert_sunset" → "breathtaking desert landscape during golden sunset hour with warm orange and pink hues painting the sky, sand dunes creating dramatic shadows, and soft golden light"
+    9. Focus on making the specified location look professional, photogenic, and visually rich
+    10. Ensure lighting and atmosphere match the location and complement the overall look
+    11. Use descriptive, evocative language to bring the location to life`;
     }
 
     // Gemini'ye gönderilecek metin (Gen4 Image formatında)
@@ -718,7 +721,7 @@ async function enhancePromptWithGemini(
     You will create a prompt for the Gen4 Image model that uses reference tags and images.
     
                 REFERENCE SYSTEM:
-      - @TAK = The model/body (from the second reference image) - BODY/POSE REFERENCE ONLY - IGNORE ALL CLOTHING ON THIS MODEL
+      - @TAK = The model/person (from the second reference image) - PERSON/POSE REFERENCE ONLY - IGNORE ALL CLOTHING ON THIS MODEL
       - @TOK = The clothing/product (from the third reference image) - THIS IS THE NEW CLOTHING TO BE DESCRIBED
       
       🚨🚨 CRITICAL INSTRUCTIONS FOR GEN4 IMAGE 🚨🚨:
@@ -732,32 +735,35 @@ async function enhancePromptWithGemini(
       - 🚫 NEVER mention the model's existing outfit, regardless of what it looks like
       - ✅ ONLY describe the @TOK product/clothing in extreme detail
       - ✅ The @TOK clothing is completely different from what @TAK is wearing
-      - Focus: @TAK body type/pose wearing @TOK new product (not current outfit)
+      - Focus: @TAK person/pose wearing @TOK new product (not current outfit)
     
-        🎯 PROMPT STRUCTURE: Create a detailed 800-1000 character sentence using @TAK and @TOK tags.
+        🎯 PROMPT STRUCTURE: Create a VERY detailed 950-1000 character sentence using @TAK and @TOK tags.
     
-    CORE REQUIREMENTS FOR GEN4 IMAGE:
-    1. USE @TAK for the body/pose reference
-    2. USE @TOK for the NEW clothing to be worn
-    3. TARGET LENGTH: 800-1000 characters (detailed description)
-    4. NEVER describe @TAK's current clothing - only reference body/pose
+          CORE REQUIREMENTS FOR GEN4 IMAGE:
+      1. USE @TAK for the person/pose reference (NOT "@TAK body" - just "@TAK")
+      2. USE @TOK for the NEW clothing to be worn
+      3. TARGET LENGTH: 950-1000 characters (MAXIMIZE the character limit!)
+      4. NEVER describe @TAK's current clothing - only reference person/pose
+      5. EXPAND ALL SETTINGS INTO DETAILED DESCRIPTIONS (don't just copy keywords)
+      6. COMPLETE the sentence properly - don't cut off in the middle
     
-    EXAMPLE FORMAT:
-    "@TAK body wearing @TOK [extensive detailed description of the new clothing including colors, materials, textures, cut, style, design elements, fit, silhouette, fabric details, construction, seasonal appropriateness, styling elements], photographed in [detailed lighting and setting description with mood, atmosphere, and professional photography style]"
+          EXAMPLE FORMAT:
+      "@TAK wearing @TOK [extensive detailed description of the new clothing including colors, materials, textures, cut, style, design elements, fit, silhouette, fabric details, construction, seasonal appropriateness, styling elements], photographed in [detailed lighting and setting description with mood, atmosphere, and professional photography style]"
     
-    DETAILED EXAMPLE (Single Item):
-    "@TAK body wearing @TOK luxurious cashmere blend sweater in soft dusty rose color with intricate cable-knit pattern, featuring a relaxed oversized fit with dropped shoulders, ribbed crew neckline, and subtly textured knit construction that catches light beautifully, paired with the sweater's premium wool blend offering exceptional drape and movement, complemented by delicate mother-of-pearl buttons along the side seam and fine merino wool blend that provides both warmth and breathability, perfectly suited for transitional seasons, photographed in warm golden hour lighting with soft shadows creating depth and dimension, professional fashion photography style with shallow depth of field"
+          DETAILED EXAMPLE (Single Item - 950+ characters):
+      "@TAK wearing @TOK luxurious cashmere blend sweater in soft dusty rose color with intricate cable-knit pattern featuring diamond-shaped motifs, showcasing a relaxed oversized fit with dramatically dropped shoulders, ribbed crew neckline with subtle contrast edging, and subtly textured knit construction that catches light beautifully with a lustrous sheen, paired with the sweater's premium wool blend offering exceptional drape and fluid movement, complemented by delicate mother-of-pearl buttons along the side seam with matching interior grosgrain tape, fine merino wool blend that provides both exceptional warmth and breathability with temperature-regulating properties, perfectly suited for transitional seasons with versatile styling options, photographed in a breathtaking golden hour outdoor setting with warm amber light filtering through towering trees, creating soft romantic shadows and depth, captured with professional fashion photography techniques using shallow depth of field and cinematic composition that emphasizes both the garment's luxurious texture and the model's natural elegance"
     
-    DETAILED EXAMPLE (Multiple Items):
-    "@TAK body wearing @TOK coordinated outfit ensemble featuring a soft coral striped knit sweater with cream and orange horizontal stripes, ribbed crew neckline and relaxed fit construction in premium cotton blend, paired with high-waisted navy blue and white vertical pinstripe wide-leg trousers with tailored silhouette and flowing drape, complemented by delicate gold charm bracelet with intricate detailing, classic tortoiseshell sunglasses with gradient lenses, and soft pink leather structured handbag with gold hardware, creating a cohesive spring-summer look that balances casual comfort with refined sophistication, photographed in the original background setting with natural lighting"
+          DETAILED EXAMPLE (Multiple Items - 950+ characters):
+      "@TAK wearing @TOK coordinated outfit ensemble featuring a soft coral striped knit sweater with cream and vibrant orange horizontal stripes in varying widths, ribbed crew neckline with reinforced stitching and relaxed oversized fit construction in premium cotton blend with subtle stretch, paired with high-waisted navy blue and white vertical pinstripe wide-leg trousers featuring classic tailored silhouette with flowing drape and elegant movement, complemented by delicate 14k gold charm bracelet with intricate geometric detailing and vintage-inspired elements, classic tortoiseshell acetate sunglasses with gradient amber lenses offering UV protection, soft blush pink leather structured handbag with polished gold hardware and adjustable chain strap, white canvas sneakers with leather trim and rubber soles, creating a cohesive spring-summer look that perfectly balances casual comfort with refined urban sophistication, photographed in a breathtaking desert landscape during golden sunset hour with warm orange and pink hues painting the dramatic sky, sand dunes creating elegant shadows, soft golden light illuminating the entire scene with cinematic warmth and natural beauty"
     
-    🚨 WRONG EXAMPLE (WHAT NOT TO DO):
-    "@TAK body wearing @TOK leopard print midi dress..." ← THIS IS WRONG! This describes @TAK's current outfit, not @TOK product
-    
-    🚨 CORRECT MINDSET:
-    - If @TAK shows a woman in a leopard dress, IGNORE the leopard dress completely
-    - If @TOK shows a pink sweater, describe ONLY the pink sweater in detail
-    - Think: "@TAK body type wearing @TOK [new product details]"
+          🚨 WRONG EXAMPLE (WHAT NOT TO DO):
+      "@TAK wearing @TOK leopard print midi dress..." ← THIS IS WRONG! This describes @TAK's current outfit, not @TOK product
+      
+      🚨 CORRECT MINDSET:
+      - If @TAK shows a woman in a leopard dress, IGNORE the leopard dress completely
+      - If @TOK shows a pink sweater, describe ONLY the pink sweater in detail
+      - Think: "@TAK wearing @TOK [new product details]"
+      - Use "@TAK" not "@TAK body" - @TAK already represents the person
     
     CRITICAL CLOTHING ANALYSIS RULES:
     🚫 DO NOT describe any clothing currently on @TAK model
@@ -779,11 +785,14 @@ async function enhancePromptWithGemini(
     - Include mood and atmosphere descriptions
     - Add any relevant props or environmental elements
     
-    SETTINGS INTEGRATION:
-    - Incorporate user settings naturally into the prompt
-    - Use location settings for background details
-    - Use mood settings for expression and atmosphere
-    - Use color settings for styling choices
+    SETTINGS INTEGRATION - EXPAND KEYWORDS INTO DETAILED DESCRIPTIONS:
+    - DON'T just copy settings keywords (e.g. "desert_sunset") 
+    - EXPAND settings into detailed, descriptive language
+    - Location "desert_sunset" → "photographed in a breathtaking desert landscape during golden sunset hour with warm orange and pink hues painting the sky, sand dunes creating dramatic shadows, and soft golden light illuminating the scene"
+    - Weather "snowy" → "captured in a winter wonderland with gentle snowflakes falling, creating a pristine white landscape with soft, diffused lighting and a serene atmosphere"
+    - Mood "confident" → "with a confident, empowered expression and strong, assured body language that radiates self-assurance"
+    - Use ALL available characters (950-1000) by expanding every detail
+    - Make the prompt cinematic and visually rich
     
     ${
       hasProductColor
@@ -821,39 +830,55 @@ async function enhancePromptWithGemini(
     - Maintain editorial magazine sophistication
     
     OUTPUT FORMAT FOR GEN4 IMAGE:
-    Create a single, extensive detailed sentence that uses @TAK and @TOK tags to describe the scene. Write it as if you're describing a professional fashion photo shoot${
-      !hasLocation ? ", keeping the original background from @TAK model" : ""
+    Create a single, EXTENSIVELY detailed sentence (950-1000 characters) that uses @TAK and @TOK tags to describe the scene. Write it as if you're describing a professional fashion photo shoot${
+      !hasLocation
+        ? ", keeping the original background from @TAK model but describing it in cinematic detail"
+        : ""
     }${
       hasValidSettings
-        ? ". Naturally incorporate the user's style preferences"
+        ? ". EXPAND all user style preferences into detailed, atmospheric descriptions (don't just copy keywords)"
         : ""
-    }.
+    }. USE EVERY AVAILABLE CHARACTER to create a visually rich, cinematic prompt.
     
-    🚨 CRITICAL REQUIREMENTS:
-    - TARGET LENGTH: 800-1000 characters (detailed fashion description)
-    - NEVER mention @TAK's current clothing - only body/pose reference
-    - EXTENSIVELY describe @TOK clothing: materials, colors, textures, construction, fit, style, details
-    - DESCRIBE EVERY SINGLE ITEM visible in @TOK image (if multiple items present)
-    - Include professional photography elements: lighting, setting, mood, composition
-    - ${
-      !hasLocation
-        ? "KEEP the original background from @TAK model unchanged"
-        : "Use the specified location setting"
-    }
+          🚨 CRITICAL REQUIREMENTS:
+      - TARGET LENGTH: 950-1000 characters (MAXIMIZE the character limit!)
+      - Use "@TAK wearing @TOK" format (NOT "@TAK body wearing @TOK")
+      - NEVER mention @TAK's current clothing - only person/pose reference
+      - EXTENSIVELY describe @TOK clothing: materials, colors, textures, construction, fit, style, details
+      - DESCRIBE EVERY SINGLE ITEM visible in @TOK image (if multiple items present)
+      - EXPAND ALL USER SETTINGS into detailed, cinematic descriptions (don't just copy keywords)
+      - Include professional photography elements: lighting, setting, mood, composition
+      - ${
+        !hasLocation
+          ? "KEEP the original background from @TAK model unchanged but describe it in detail"
+          : "EXPAND the location setting into a detailed, atmospheric description"
+      }
+      - USE EVERY AVAILABLE CHARACTER (950-1000) to create a visually rich, detailed prompt
+      - COMPLETE the sentence properly - don't cut off mid-word or mid-phrase
     
-    🚨 FINAL REMINDER: Output should be a single, EXTENSIVELY DETAILED Gen4 Image prompt sentence using @TAK (body reference only) and @TOK (new clothing with complete details) tags. Target 800-1000 characters!
+          🚨 FINAL REMINDER: Output should be a single, EXTENSIVELY DETAILED Gen4 Image prompt sentence using @TAK (person reference only) and @TOK (new clothing with complete details) tags. Target 950-1000 characters and EXPAND all settings into detailed descriptions!
+      
+      🚨 CRITICAL COMPLETION REQUIREMENT:
+      - The prompt MUST be a COMPLETE sentence that ends naturally
+      - Do NOT cut off in the middle like "captured with professional fash..."
+      - FINISH the sentence properly even if it means slightly fewer characters
+      - Better to have 900 complete characters than 1000 incomplete ones
+      - End with proper photography/lighting/atmosphere description
+      - Example endings: "...captured with professional fashion photography techniques" or "...in soft natural lighting that enhances every detail"
     
-    🚨🚨 LAST CRITICAL CHECK BEFORE WRITING:
-    - Look at the first image (@TAK) - ignore ALL clothing on this model, use only body/pose reference
-    - Look at the second image (@TOK) - describe EVERY SINGLE ITEM visible in detail
-    - The @TAK model's outfit is NOT what you should describe
-    - The @TOK product(s) are what you MUST describe (if multiple items, describe each one)
-    - For background: ${
-      !hasLocation
-        ? "keep the original background from @TAK unchanged"
-        : "use the specified location"
-    }
-    - Think: "Model body wearing NEW product(s) (not current outfit) in original/specified background"
+          🚨🚨 LAST CRITICAL CHECK BEFORE WRITING:
+      - Look at the first image (@TAK) - ignore ALL clothing on this model, use only person/pose reference
+      - Look at the second image (@TOK) - describe EVERY SINGLE ITEM visible in detail
+      - The @TAK model's outfit is NOT what you should describe
+      - The @TOK product(s) are what you MUST describe (if multiple items, describe each one)
+      - Use "@TAK wearing @TOK" format (NOT "@TAK body wearing @TOK")
+      - For background: ${
+        !hasLocation
+          ? "keep the original background from @TAK unchanged"
+          : "use the specified location"
+      }
+      - Think: "@TAK wearing NEW @TOK product(s) (not current outfit) in original/specified background"
+      - FINISH the prompt as a complete sentence - don't cut off mid-word
     `;
 
     console.log(
