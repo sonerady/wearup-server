@@ -10,7 +10,7 @@ const { v4: uuidv4 } = require("uuid");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // Kategorileri import et
-const { CATEGORIES } = require("../../../client/constants/categories");
+const { CATEGORIES } = require("../constants/categories");
 
 // Gemini API anahtarını alıyoruz
 const apiKey = process.env.GEMINI_API_KEY;
