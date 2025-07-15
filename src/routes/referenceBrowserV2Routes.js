@@ -2870,7 +2870,8 @@ router.get("/credit/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
 
-    if (!userId || userId === "anonymous_user") {
+    // Anonim kullanıcı kontrolü (hem "anonymous_user" hem de "anon_" ile başlayanlar)
+    if (!userId || userId === "anonymous_user" || userId.startsWith("anon_")) {
       return res.status(200).json({
         success: true,
         result: {

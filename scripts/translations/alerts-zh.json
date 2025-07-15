@@ -1,0 +1,15 @@
+{
+  "paywall": {
+    "alerts": {
+      "purchaseSuccessTitle": "🎉 购买成功！",
+      "creditsAddedToAccount": "✨ 太棒了！{{amount}} 积分已添加到您的账户。现在您可以使用更多AI功能了！ 💫",
+      "subscriptionActiveTitle": "👑 PRO会员已激活！",
+      "subscriptionActivatedSuccessfully": "🚀 恭喜！您的PRO会员已激活。现在您可以使用高级功能了！ ✨",
+      "coinPackPurchaseTitle": "💰 积分包购买成功！",
+      "coinPackCreditsAdded": "🎊 太棒了！{{credits}} 积分已添加到您的账户。享受您的{{packageName}}包吧！ 🌟",
+      "subscriptionCreditsAdded": "👑 PRO会员 + {{credits}} 积分已添加！ 🎉",
+      "subscriptionWithCreditsMessage": "✨ 太棒了！您的PRO会员已激活，{{credits}} 积分已添加到您的账户。现在您可以使用高级功能了！ 🚀",
+      "ok": "太棒了！ 🎉"
+    }
+  }
+}

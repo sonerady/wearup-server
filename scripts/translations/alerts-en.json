@@ -1,0 +1,15 @@
+{
+  "paywall": {
+    "alerts": {
+      "purchaseSuccessTitle": "🎉 Purchase Successful!",
+      "creditsAddedToAccount": "✨ Amazing! {{amount}} credits have been added to your account. Now you can use more AI features! 💫",
+      "subscriptionActiveTitle": "👑 PRO Membership Active!",
+      "subscriptionActivatedSuccessfully": "🚀 Congratulations! Your PRO membership has been activated. You can now use premium features! ✨",
+      "coinPackPurchaseTitle": "💰 Credit Pack Purchased!",
+      "coinPackCreditsAdded": "🎊 Awesome! {{credits}} credits have been added to your account. Now enjoy your {{packageName}} pack! 🌟",
+      "subscriptionCreditsAdded": "👑 PRO Membership + {{credits}} Credits Added! 🎉",
+      "subscriptionWithCreditsMessage": "✨ Amazing! Your PRO membership has been activated and {{credits}} credits have been added to your account. You can now use premium features! 🚀",
+      "ok": "Awesome! 🎉"
+    }
+  }
+}

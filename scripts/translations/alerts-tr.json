@@ -1,0 +1,15 @@
+{
+  "paywall": {
+    "alerts": {
+      "purchaseSuccessTitle": "🎉 Satın Alma Başarılı!",
+      "creditsAddedToAccount": "✨ Harika! {{amount}} kredi hesabınıza eklendi. Artık daha fazla AI özellik kullanabilirsiniz! 💫",
+      "subscriptionActiveTitle": "👑 PRO Üyelik Aktif!",
+      "subscriptionActivatedSuccessfully": "🚀 Tebrikler! PRO üyeliğiniz aktif edildi. Artık premium özellikleri kullanabilirsiniz! ✨",
+      "coinPackPurchaseTitle": "💰 Kredi Paketi Satın Alındı!",
+      "coinPackCreditsAdded": "🎊 Muhteşem! {{credits}} kredi hesabınıza eklendi. {{packageName}} paketinin keyfini çıkarın! 🌟",
+      "subscriptionCreditsAdded": "👑 PRO Üyelik + {{credits}} Kredi Eklendi! 🎉",
+      "subscriptionWithCreditsMessage": "✨ Harika! PRO üyeliğiniz aktif edildi ve {{credits}} kredi hesabınıza eklendi. Artık premium özellikleri kullanabilirsiniz! 🚀",
+      "ok": "Harika! 🎉"
+    }
+  }
+}

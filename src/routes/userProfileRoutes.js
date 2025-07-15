@@ -7,6 +7,23 @@ router.get("/profile/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
 
+    // Anonim kullanıcı kontrolü
+    if (userId.startsWith("anon_")) {
+      return res.status(200).json({
+        profile: {
+          id: userId,
+          username: "Anonim Kullanıcı",
+          email: null,
+          avatar_url: null,
+          is_pro: false,
+          credit_balance: 0,
+          gender: "female", // varsayılan
+          preferred_styles: ["casual", "trendy"], // varsayılan
+          created_at: new Date().toISOString(),
+        },
+      });
+    }
+
     const { data: profile, error } = await supabase
       .from("users")
       .select("*")
@@ -560,6 +577,20 @@ router.get("/profile/onboarding-status/:userId", async (req, res) => {
       });
     }
 
+    // Anonim kullanıcı kontrolü
+    if (userId.startsWith("anon_")) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          age_range: null,
+          user_gender: "female", // varsayılan
+          preferred_styles: ["casual", "trendy"], // varsayılan
+          onboarding_completed: true, // anonim kullanıcılar onboarding'i tamamlamış sayılır
+          onboarding_completed_at: new Date().toISOString(),
+        },
+      });
+    }
+
     const { data: user, error } = await supabase
       .from("users")
       .select(
@@ -655,6 +686,16 @@ router.get("/profile/categories/:userId", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Kullanıcı ID'si gereklidir",
+      });
+    }
+
+    // Anonim kullanıcı kontrolü
+    if (userId.startsWith("anon_")) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          categories: ["1", "3", "4", "5", "8", "13"], // varsayılan kategoriler
+        },
       });
     }
 
@@ -806,6 +847,16 @@ router.get("/profile/active-categories/:userId", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Kullanıcı ID'si gereklidir",
+      });
+    }
+
+    // Anonim kullanıcı kontrolü
+    if (userId.startsWith("anon_")) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          active_categories: ["5", "4", "1", "3"], // varsayılan aktif kategoriler
+        },
       });
     }
 

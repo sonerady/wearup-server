@@ -1,0 +1,15 @@
+{
+  "paywall": {
+    "alerts": {
+      "purchaseSuccessTitle": "🎉 購入成功！",
+      "creditsAddedToAccount": "✨ 素晴らしい！{{amount}}クレジットがアカウントに追加されました。より多くのAI機能をご利用いただけます！ 💫",
+      "subscriptionActiveTitle": "👑 PROメンバーシップ有効！",
+      "subscriptionActivatedSuccessfully": "🚀 おめでとうございます！PROメンバーシップが有効になりました。プレミアム機能をご利用いただけます！ ✨",
+      "coinPackPurchaseTitle": "💰 クレジットパック購入完了！",
+      "coinPackCreditsAdded": "🎊 素晴らしい！{{credits}}クレジットがアカウントに追加されました。{{packageName}}パックをお楽しみください！ 🌟",
+      "subscriptionCreditsAdded": "👑 PROメンバーシップ + {{credits}}クレジット追加！ 🎉",
+      "subscriptionWithCreditsMessage": "✨ 素晴らしい！PROメンバーシップが有効になり、{{credits}}クレジットがアカウントに追加されました。プレミアム機能をご利用いただけます！ 🚀",
+      "ok": "素晴らしい！ 🎉"
+    }
+  }
+}

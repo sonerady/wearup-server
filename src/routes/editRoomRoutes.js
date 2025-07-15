@@ -342,65 +342,58 @@ function formatAspectRatio(ratioStr) {
   }
 }
 
-// EditRoom için basit prompt iyileştirme fonksiyonu
+// EditRoom için Gen4 @TAK prompt iyileştirme fonksiyonu
 async function enhancePromptWithGemini(
   originalPrompt,
   referenceImageUrl,
   settings = {}
 ) {
   try {
-    console.log("Gemini ile EditRoom prompt iyileştirme başlatılıyor");
+    console.log("Gemini ile Gen4 @TAK prompt iyileştirme başlatılıyor");
     console.log("Original prompt:", originalPrompt);
 
     // Gemini modeli
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Basit prompt talimatı
+    // Gen4 için kısa AI edit prompt talimatı
     const promptForGemini = `
-You are creating a prompt for FLUX Kontext, an AI image editing tool. Look at the provided image and the user's request: "${originalPrompt}"
+You are creating a short AI edit prompt for Gen4 image editing. Look at the provided image and the user's request: "${originalPrompt}"
 
-FLUX KONTEXT PROMPT OPTIMIZATION (CRITICAL FOR BEST RESULTS):
+CRITICAL INSTRUCTIONS:
 
-You are generating a prompt for FLUX Kontext, a surgical image editing model. Follow these MANDATORY guidelines:
+🎯 ALWAYS USE @TAK REFERENCE:
+- MANDATORY: Always mention "@TAK" when referring to the person in the image
+- Example: "Give @TAK a gothic fashion style" or "Change @TAK's hair color to blonde"
 
-🔧 PROMPT STRUCTURE (EXACTLY 3 CLAUSES):
-1) [MAIN_ACTION] - Start with precise action verb (Change/Transform/Add/Remove/Replace) + specific target
-2) [PRESERVE] - "while keeping" + ALL elements that must remain unchanged
-3) [DETAILS] - Camera, lighting, style refinements, scene context
+📏 KEEP IT SHORT AND FOCUSED:
+- Maximum 100 characters
+- Single action, clear and specific
+- No unnecessary words or descriptions
+- Focus on the main edit request only
 
-📏 CRITICAL LIMITS:
-- MAXIMUM 512 tokens (Kontext will cut off longer prompts)
-- ONE flowing sentence with semicolons separating the 3 clauses
-- NO line breaks or multiple sentences
+🔧 EDIT PROMPT STRUCTURE:
+- Start with action verb (Give/Change/Add/Remove/Make)
+- Always include "@TAK" reference
+- Specify the change clearly
+- Add "Keep everything else the same" if needed
 
-🎯 ACTION VERBS (Use these proven high-impact verbs):
-- Change (for color, material, style modifications)
-- Transform (for style transfers)
-- Replace (for object substitution)
-- Add (for new elements)
-- Remove (for deletions)
+✅ GOOD EXAMPLES:
+- "Give @TAK a gothic fashion style with dark makeup, accessories, and clothing. Keep her pose and background the same."
+- "Change @TAK's hair color to blonde. Keep everything else the same."
+- "Add sunglasses to @TAK. Keep pose and background the same."
 
-🛡️ PRESERVE CLAUSE (NEVER OMIT):
-Essential to prevent unwanted artifacts. Always include "while keeping" + specify:
-- Pose and body positioning
-- Facial features and expression
-- Background elements
-- Lighting conditions
-- All original garment details not being changed
-- Construction, fit, and proportions
+❌ AVOID:
+- Long descriptions
+- Multiple changes in one prompt
+- Generic references like "the person" or "subject"
+- Unnecessary details about lighting, camera, etc.
 
-IMPORTANT INSTRUCTION: Generate ONLY a single, flowing FLUX Kontext prompt following the 3-clause structure. Do not include explanations, introductions, or commentary. The prompt should be surgical and specific, not descriptive scene creation.
+LANGUAGE: Always generate the prompt in English, translate any non-English words.
 
-LANGUAGE NORMALIZATION RULES:
-- Translate every word and phrase that is not in English (e.g., colors, locations, garment descriptors) into English in the generated prompt. Example: convert "beyaz studio" to "white studio". The final prompt MUST be entirely in English.
-
-Based on the user's request and the image, create a FLUX Kontext edit prompt that will accomplish exactly what they asked for.
+Based on the user's request and the image, create a short Gen4 edit prompt that mentions @TAK and accomplishes exactly what they asked for.
     `;
 
-    console.log(
-      "Gemini'ye gönderilen EditRoom prompt talimatı:",
-      promptForGemini
-    );
+    console.log("Gemini'ye gönderilen Gen4 prompt talimatı:", promptForGemini);
 
     // Resim verilerini içerecek parts dizisini hazırla
     const parts = [{ text: promptForGemini }];
@@ -439,7 +432,7 @@ Based on the user's request and the image, create a FLUX Kontext edit prompt tha
     let enhancedPrompt = result.response.text().trim();
 
     console.log(
-      "🤖 [BACKEND GEMINI] Gemini'nin ürettiği FLUX Kontext prompt:",
+      "🤖 [BACKEND GEMINI] Gemini'nin ürettiği Gen4 @TAK prompt:",
       enhancedPrompt
     );
 
@@ -724,34 +717,26 @@ router.post("/generate", async (req, res) => {
     console.log("📝 [BACKEND MAIN] Original prompt:", promptText);
     console.log("✨ [BACKEND MAIN] Enhanced prompt:", enhancedPrompt);
 
-    // Replicate API'ye istek gönder - tek referans görseli kullan
-    const fluxInput = {
+    // Replicate Gen4 API'ye istek gönder - @TAK referansıyla (referenceBrowserRoutes.js formatında)
+    const gen4Input = {
       prompt: enhancedPrompt,
-      input_image: referenceImageUrl, // Tek referans görseli
+      aspect_ratio: formattedRatio,
+      reference_tags: ["TAK"],
+      reference_images: [referenceImageUrl],
     };
 
-    // EditRoom'da "original" ratio seçilmişse match_input_image kullan, yoksa aspect_ratio
-    if (match_input_image) {
-      fluxInput.match_input_image = true;
-      console.log(
-        "✅ Original ratio seçildi - match_input_image: true kullanılıyor"
-      );
-    } else {
-      fluxInput.aspect_ratio = formattedRatio;
-      console.log(
-        `✅ Sabit ratio seçildi - aspect_ratio: ${formattedRatio} kullanılıyor`
-      );
-    }
+    console.log("🎯 Gen4 API'ye gönderilen input:", gen4Input);
 
     const replicateResponse = await got.post(
-      "https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-max/predictions",
+      "https://api.replicate.com/v1/models/runwayml/gen4-image/predictions",
       {
         headers: {
           Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
           "Content-Type": "application/json",
+          Prefer: "wait",
         },
         json: {
-          input: fluxInput,
+          input: gen4Input,
         },
         responseType: "json",
       }
@@ -945,7 +930,8 @@ router.get("/credit/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
 
-    if (!userId || userId === "anonymous_user") {
+    // Anonim kullanıcı kontrolü (hem "anonymous_user" hem de "anon_" ile başlayanlar)
+    if (!userId || userId === "anonymous_user" || userId.startsWith("anon_")) {
       return res.status(200).json({
         success: true,
         result: {
