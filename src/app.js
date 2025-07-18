@@ -78,6 +78,9 @@ const exploreRoutes = require("./routes/exploreRoutes");
 
 const geminiTryOnProductCratorRoutes = require("./routes/geminiTryOnProductCratorRoutes");
 
+// Outfit composer routes
+const outfitComposerRoutes = require("./routes/outfitComposer");
+
 const app = express();
 
 // CORS ayarlarını daha esnek hale getir
@@ -198,6 +201,7 @@ app.use("/api/pinterest", pinterestRoutes);
 app.use("/api", rankingsRoutes);
 app.use("/api", styleBattlesRoutes);
 app.use("/api/planner", plannerRoutes);
+app.use("/api/outfit", outfitComposerRoutes);
 app.use("/api/style-battles", styleBattlesRoutes);
 app.use("/api/rankings", rankingsRoutes);
 app.use("/api/tournaments", tournamentRoutes);

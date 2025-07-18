@@ -1,0 +1,16 @@
+{
+  "newOutfitDetail": {
+    "selectClothes": "Select the clothes below",
+    "createOutfit": "and create an outfit",
+    "opacity": "Opacity",
+    "zoom": "Zoom",
+    "selectBackground": "Select a background to see controls",
+    "comingSoon": "Coming Soon",
+    "empty": "Empty",
+    "closet": "Closet",
+    "backgrounds": "Backgrounds",
+    "text": "Text",
+    "stickers": "Stickers",
+    "soon": "Soon"
+  }
+}

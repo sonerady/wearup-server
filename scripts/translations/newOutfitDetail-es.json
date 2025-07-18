@@ -1,0 +1,16 @@
+{
+  "newOutfitDetail": {
+    "selectClothes": "Selecciona la ropa de abajo",
+    "createOutfit": "y crea un outfit",
+    "opacity": "Opacidad",
+    "zoom": "Zoom",
+    "selectBackground": "Selecciona un fondo para ver controles",
+    "comingSoon": "Próximamente",
+    "empty": "Vacío",
+    "closet": "Armario",
+    "backgrounds": "Fondos",
+    "text": "Texto",
+    "stickers": "Pegatinas",
+    "soon": "Pronto"
+  }
+}

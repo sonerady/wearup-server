@@ -2110,6 +2110,105 @@ router.put("/wardrobe/outfits/:id/background", async (req, res) => {
   }
 });
 
+// Outfit güncelleme endpoint'i (cover URL, background vs.)
+router.put("/wardrobe/outfits/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      outfit_cover_url,
+      background_color,
+      background_image_url,
+      background_opacity,
+      name,
+      visibility,
+    } = req.body;
+
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Outfit ID gerekli",
+      });
+    }
+
+    console.log(`Outfit güncelleniyor. ID: ${id}`);
+    console.log("Güncellenecek veriler:", {
+      outfit_cover_url,
+      background_color,
+      background_image_url,
+      background_opacity,
+      name,
+      visibility,
+    });
+
+    // UUID formatı kontrolü
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Geçersiz Outfit ID formatı",
+      });
+    }
+
+    // Güncellenecek veriler için obje oluştur
+    const updateData = {
+      updated_at: new Date().toISOString(),
+    };
+
+    // Sadece gönderilen alanları güncelle
+    if (outfit_cover_url !== undefined)
+      updateData.outfit_cover_url = outfit_cover_url;
+    if (background_color !== undefined)
+      updateData.background_color = background_color;
+    if (background_image_url !== undefined)
+      updateData.background_image_url = background_image_url;
+    if (background_opacity !== undefined)
+      updateData.background_opacity = background_opacity;
+    if (name !== undefined) updateData.name = name;
+    if (visibility !== undefined) updateData.visibility = visibility;
+
+    console.log("Final güncelleme verileri:", updateData);
+
+    // Outfit'i güncelle
+    const { data, error } = await supabase
+      .from("wardrobe_outfits")
+      .update(updateData)
+      .eq("id", id)
+      .select();
+
+    if (error) {
+      console.error("Outfit güncellenirken hata:", error);
+      return res.status(400).json({
+        success: false,
+        message: "Outfit güncellenirken bir hata oluştu",
+        error: error.message,
+      });
+    }
+
+    if (!data || data.length === 0) {
+      console.log(`Outfit bulunamadı. ID: ${id}`);
+      return res.status(404).json({
+        success: false,
+        message: "Belirtilen ID'ye sahip outfit bulunamadı",
+      });
+    }
+
+    console.log(`✅ Outfit başarıyla güncellendi. ID: ${id}`);
+    return res.status(200).json({
+      success: true,
+      message: "Outfit başarıyla güncellendi",
+      data: data[0],
+    });
+  } catch (error) {
+    console.error("Outfit güncelleme hatası:", error);
+    res.status(500).json({
+      success: false,
+      message: "Outfit güncellenirken bir hata oluştu",
+      error: error.message,
+    });
+  }
+});
+
 // Outfit item'larının pozisyonlarını güncelleme endpoint'i
 router.put("/wardrobe/outfit-items/position", async (req, res) => {
   try {
