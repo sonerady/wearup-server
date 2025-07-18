@@ -12,8 +12,11 @@ const FormData = require("form-data");
 // .env dosyasını yükle
 dotenv.config();
 
-// PhotoRoom API anahtarını al
-const PHOTOROOM_API_KEY = process.env.PHOTOROOM_API_KEY;
+// Replicate API anahtarını al
+const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
+
+// Image resizer script'ini import et
+const { resizeImageFromUrlToBuffer } = require("../../scripts/image-resizer");
 
 // Replicate URL'yi Supabase'e yükleyip yeni URL döndüren yardımcı fonksiyon
 const uploadReplicateUrlToSupabase = async (replicateUrl) => {
@@ -1234,65 +1237,68 @@ router.post("/wardrobe/outfits/remove-background", async (req, res) => {
           `Arkaplan kaldırma işlemi başlıyor: ${imageUrl.substring(0, 50)}...`
         );
 
-        // Görüntüyü indir
-        const imageResponse = await axios.get(imageUrl, {
-          responseType: "arraybuffer",
-        });
-
-        // FormData oluştur
-        const formData = new FormData();
-        const buffer = Buffer.from(imageResponse.data);
-
-        // FormData'ya imageFile ekle
-        formData.append("image_file", buffer, {
-          filename: "image.jpg",
-          contentType: imageResponse.headers["content-type"] || "image/jpeg",
-        });
-
-        // Parametreleri ekle
-        formData.append("crop", "true");
-        formData.append("format", "png");
-        formData.append("size", "hd");
-
-        // PhotoRoom API'ye istek at
-        console.log(`PhotoRoom API'ye istek atılıyor...`);
-        const photoRoomResponse = await axios.post(
-          "https://sdk.photoroom.com/v1/segment",
-          formData,
+        // Replicate API'ye istek at
+        console.log(`Replicate API'ye istek atılıyor...`);
+        const replicateResponse = await axios.post(
+          "https://api.replicate.com/v1/models/bria/remove-background/predictions",
+          {
+            input: {
+              image: imageUrl,
+              content_moderation: false,
+              preserve_partial_alpha: true,
+            },
+          },
           {
             headers: {
-              "x-api-key": PHOTOROOM_API_KEY,
-              ...formData.getHeaders(),
+              Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+              "Content-Type": "application/json",
+              Prefer: "wait",
             },
-            responseType: "arraybuffer",
+            timeout: 60000, // 60 saniye timeout
           }
         );
 
-        console.log(`PhotoRoom API yanıtı alındı: ${photoRoomResponse.status}`);
+        console.log(`Replicate API yanıtı alındı: ${replicateResponse.status}`);
 
-        if (photoRoomResponse.status !== 200) {
-          throw new Error(`PhotoRoom API hatası: ${photoRoomResponse.status}`);
+        if (
+          replicateResponse.status !== 200 &&
+          replicateResponse.status !== 201
+        ) {
+          throw new Error(`Replicate API hatası: ${replicateResponse.status}`);
         }
 
-        // İşlenen resmi geçici olarak kaydet
-        const fileName = `temp_${Date.now()}_${Math.random()
+        // Replicate yanıtını kontrol et
+        const replicateResult = replicateResponse.data;
+
+        if (!replicateResult.output) {
+          throw new Error("Replicate API'den çıktı alınamadı");
+        }
+
+        const processedImageUrl = replicateResult.output;
+        console.log(
+          `Replicate'ten işlenmiş resim URL'si alındı: ${processedImageUrl.substring(
+            0,
+            50
+          )}...`
+        );
+
+        // İşlenmiş resmi image-resizer script'i ile padding kaldırarak işle
+        console.log("Padding kaldırma işlemi başlatılıyor...");
+        const processedBuffer = await resizeImageFromUrlToBuffer(
+          processedImageUrl
+        );
+
+        console.log(
+          `Padding kaldırıldı, buffer boyutu: ${processedBuffer.length} bytes`
+        );
+
+        // İşlenmiş resmi Supabase'e yükle (direkt buffer ile)
+        const fileName = `replicate_processed_${Date.now()}_${Math.random()
           .toString(36)
           .substring(2, 10)}.png`;
-        const filePath = path.join(__dirname, "../../temp", fileName);
-
-        // Temp klasörünün varlığını kontrol et ve yoksa oluştur
-        const tempDir = path.join(__dirname, "../../temp");
-        if (!fs.existsSync(tempDir)) {
-          fs.mkdirSync(tempDir, { recursive: true });
-        }
-
-        // Dosyayı kaydet
-        fs.writeFileSync(filePath, photoRoomResponse.data);
-
-        // Dosyayı Supabase'e yükle
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("wardrobes")
-          .upload(`photoroom_${fileName}`, fs.createReadStream(filePath), {
+          .upload(`replicate_${fileName}`, processedBuffer, {
             contentType: "image/png",
             cacheControl: "3600",
           });
@@ -1304,14 +1310,13 @@ router.post("/wardrobe/outfits/remove-background", async (req, res) => {
         // Public URL al
         const { data: publicUrlData } = await supabase.storage
           .from("wardrobes")
-          .getPublicUrl(`photoroom_${fileName}`);
+          .getPublicUrl(`replicate_${fileName}`);
 
         if (!publicUrlData || !publicUrlData.publicUrl) {
           throw new Error("Public URL alınamadı");
         }
 
-        // Geçici dosyayı temizle
-        fs.unlinkSync(filePath);
+        // Artık geçici dosya silmeye gerek yok! 🎉
 
         // İşlenmiş görsel URL'sini kaydet
         processedImages.push({
