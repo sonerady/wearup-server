@@ -1,0 +1,20 @@
+{
+  "aiReferansFusion": {
+    "example1": {
+      "text": "Kombiniere mit einem stilvollen Hut und einer Sonnenbrille",
+      "title": "Style-Assistent"
+    },
+    "example2": {
+      "text": "Kannst du meine Haare goldblond färben?",
+      "title": "Haarcolorist"
+    },
+    "example3": {
+      "text": "Ändere dieses Kleid in dunkelmarineblau",
+      "title": "Farbwechsler"
+    },
+    "example4": {
+      "text": "Füge eine elegante Schmuckkette hinzu",
+      "title": "Schmuckdesigner"
+    }
+  }
+}

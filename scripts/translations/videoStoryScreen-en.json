@@ -1,0 +1,20 @@
+{
+  "stories": {
+    "virtualTryOn": "Try On Any Outfit in Seconds",
+    "styleCloset": "Style Your Closet",
+    "aiPhotoEditor": "AI Photo Editor: Change Style",
+    "yourOutfits": "Your Outfits"
+  },
+  "outfitCards": {
+    "cherryWall": "Cherry Wall",
+    "newOutfit": "New Outfit",
+    "casualStyle": "Casual Style",
+    "elegantLook": "Elegant Look"
+  },
+  "timeAgo": {
+    "daysAgo19": "19 days ago",
+    "daysAgo2": "2 days ago",
+    "daysAgo5": "5 days ago",
+    "weekAgo1": "1 week ago"
+  }
+}

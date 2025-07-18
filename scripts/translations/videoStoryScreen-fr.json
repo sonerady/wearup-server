@@ -1,0 +1,20 @@
+{
+  "stories": {
+    "virtualTryOn": "Essayez N'importe Quelle Tenue en Secondes",
+    "styleCloset": "Stylisez Votre Garde-Robe",
+    "aiPhotoEditor": "Éditeur Photo IA: Changez de Style",
+    "yourOutfits": "Vos Tenues"
+  },
+  "outfitCards": {
+    "cherryWall": "Mur de Cerise",
+    "newOutfit": "Nouvelle Tenue",
+    "casualStyle": "Style Décontracté",
+    "elegantLook": "Look Élégant"
+  },
+  "timeAgo": {
+    "daysAgo19": "il y a 19 jours",
+    "daysAgo2": "il y a 2 jours",
+    "daysAgo5": "il y a 5 jours",
+    "weekAgo1": "il y a 1 semaine"
+  }
+}

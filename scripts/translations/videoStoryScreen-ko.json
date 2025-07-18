@@ -1,0 +1,20 @@
+{
+  "stories": {
+    "virtualTryOn": "몇 초 만에 옷 입어보기",
+    "styleCloset": "옷장 스타일링하기",
+    "aiPhotoEditor": "AI 사진 편집기: 스타일 변경",
+    "yourOutfits": "나의 코디"
+  },
+  "outfitCards": {
+    "cherryWall": "체리 월",
+    "newOutfit": "새로운 코디",
+    "casualStyle": "캐주얼 스타일",
+    "elegantLook": "우아한 룩"
+  },
+  "timeAgo": {
+    "daysAgo19": "19일 전",
+    "daysAgo2": "2일 전",
+    "daysAgo5": "5일 전",
+    "weekAgo1": "1주 전"
+  }
+}

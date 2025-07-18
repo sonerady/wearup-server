@@ -1,0 +1,20 @@
+{
+  "stories": {
+    "virtualTryOn": "Kıyafetleri Saniyeler İçinde Dene",
+    "styleCloset": "Dolabını Stillendir",
+    "aiPhotoEditor": "AI Fotoğraf Editörü: Stilini Değiştir",
+    "yourOutfits": "Kombinlerin"
+  },
+  "outfitCards": {
+    "cherryWall": "Kiraz Duvarı",
+    "newOutfit": "Yeni Kombin",
+    "casualStyle": "Günlük Stil",
+    "elegantLook": "Şık Görünüm"
+  },
+  "timeAgo": {
+    "daysAgo19": "19 gün önce",
+    "daysAgo2": "2 gün önce",
+    "daysAgo5": "5 gün önce",
+    "weekAgo1": "1 hafta önce"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "aiReferansFusion": {
+    "example1": {
+      "text": "Combina con un cappello elegante e occhiali da sole",
+      "title": "Assistente di Stile"
+    },
+    "example2": {
+      "text": "Puoi tingere i miei capelli di biondo dorato?",
+      "title": "Colorista per Capelli"
+    },
+    "example3": {
+      "text": "Cambia questo vestito in blu navy scuro",
+      "title": "Cambiatore di Colore"
+    },
+    "example4": {
+      "text": "Aggiungi una collana di gioielli elegante",
+      "title": "Designer di Gioielli"
+    }
+  }
+}

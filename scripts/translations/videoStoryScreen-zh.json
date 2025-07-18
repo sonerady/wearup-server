@@ -1,0 +1,20 @@
+{
+  "stories": {
+    "virtualTryOn": "几秒钟试穿任何服装",
+    "styleCloset": "为你的衣橱设计造型",
+    "aiPhotoEditor": "AI照片编辑器：改变风格",
+    "yourOutfits": "你的搭配"
+  },
+  "outfitCards": {
+    "cherryWall": "樱桃墙",
+    "newOutfit": "新搭配",
+    "casualStyle": "休闲风格",
+    "elegantLook": "优雅造型"
+  },
+  "timeAgo": {
+    "daysAgo19": "19天前",
+    "daysAgo2": "2天前",
+    "daysAgo5": "5天前",
+    "weekAgo1": "1周前"
+  }
+}

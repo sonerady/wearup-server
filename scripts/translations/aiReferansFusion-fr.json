@@ -1,0 +1,20 @@
+{
+  "aiReferansFusion": {
+    "example1": {
+      "text": "Combine avec un chapeau élégant et des lunettes de soleil",
+      "title": "Assistant Style"
+    },
+    "example2": {
+      "text": "Peux-tu teindre mes cheveux en blond doré?",
+      "title": "Coloriste Capillaire"
+    },
+    "example3": {
+      "text": "Change cette robe en bleu marine foncé",
+      "title": "Changeur de Couleur"
+    },
+    "example4": {
+      "text": "Ajoute un collier de bijoux élégant",
+      "title": "Créateur de Bijoux"
+    }
+  }
+}

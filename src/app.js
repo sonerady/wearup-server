@@ -36,7 +36,7 @@ const faceSwapRouter = require("./routes/faceSwap");
 const geminiImageProcessRouter = require("./routes/geminiImageProcess");
 const geminiImageDetectionRouter = require("./routes/geminiImageDetection");
 const imageClarityProcessRouter = require("./routes/imageClarityProcess");
-const purchaseRoutes = require("./routes/purchaseRoutes");
+
 const webScrapingRouter = require("./routes/webScraping");
 const wardrobeRoutes = require("./routes/wardrobeRoutes");
 const favoritesRoutes = require("./routes/favoritesRoutes");
@@ -205,9 +205,7 @@ app.use("/api", generateProductNameRouter);
 app.use("/api/gemini-tryon", geminiTryOnProductCratorRoutes);
 
 // RevenueCat webhook route ekle
-
 app.use("/revenuecat", revenuecatWebhookRouter);
-app.use("/purchase", purchaseRoutes);
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server is running on port ${PORT}`);

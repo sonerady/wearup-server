@@ -1,0 +1,20 @@
+{
+  "stories": {
+    "virtualTryOn": "どんな服でも数秒で試着",
+    "styleCloset": "ワードローブをスタイリング",
+    "aiPhotoEditor": "AI写真エディター：スタイル変更",
+    "yourOutfits": "あなたのコーディネート"
+  },
+  "outfitCards": {
+    "cherryWall": "チェリーウォール",
+    "newOutfit": "新しいコーディネート",
+    "casualStyle": "カジュアルスタイル",
+    "elegantLook": "エレガントな装い"
+  },
+  "timeAgo": {
+    "daysAgo19": "19日前",
+    "daysAgo2": "2日前", 
+    "daysAgo5": "5日前",
+    "weekAgo1": "1週間前"
+  }
+} 

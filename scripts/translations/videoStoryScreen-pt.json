@@ -1,0 +1,20 @@
+{
+  "stories": {
+    "virtualTryOn": "Experimente Qualquer Roupa em Segundos",
+    "styleCloset": "Estilize Seu Guarda-Roupa",
+    "aiPhotoEditor": "Editor de Foto AI: Mude o Estilo",
+    "yourOutfits": "Seus Looks"
+  },
+  "outfitCards": {
+    "cherryWall": "Parede de Cereja",
+    "newOutfit": "Novo Look",
+    "casualStyle": "Estilo Casual",
+    "elegantLook": "Visual Elegante"
+  },
+  "timeAgo": {
+    "daysAgo19": "há 19 dias",
+    "daysAgo2": "há 2 dias",
+    "daysAgo5": "há 5 dias",
+    "weekAgo1": "há 1 semana"
+  }
+}

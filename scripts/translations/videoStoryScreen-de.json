@@ -1,0 +1,20 @@
+{
+  "stories": {
+    "virtualTryOn": "Jedes Outfit in Sekunden Anprobieren",
+    "styleCloset": "Deinen Kleiderschrank Stylen",
+    "aiPhotoEditor": "KI-Fotoeditor: Stil Ändern",
+    "yourOutfits": "Deine Outfits"
+  },
+  "outfitCards": {
+    "cherryWall": "Kirschenwand",
+    "newOutfit": "Neues Outfit",
+    "casualStyle": "Lässiger Stil",
+    "elegantLook": "Eleganter Look"
+  },
+  "timeAgo": {
+    "daysAgo19": "vor 19 Tagen",
+    "daysAgo2": "vor 2 Tagen", 
+    "daysAgo5": "vor 5 Tagen",
+    "weekAgo1": "vor 1 Woche"
+  }
+} 

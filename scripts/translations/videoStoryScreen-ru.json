@@ -1,0 +1,20 @@
+{
+  "stories": {
+    "virtualTryOn": "Примерьте Любую Одежду за Секунды",
+    "styleCloset": "Стилизуйте Ваш Гардероб",
+    "aiPhotoEditor": "ИИ Фоторедактор: Измените Стиль",
+    "yourOutfits": "Ваши Образы"
+  },
+  "outfitCards": {
+    "cherryWall": "Вишневая Стена",
+    "newOutfit": "Новый Образ",
+    "casualStyle": "Повседневный Стиль",
+    "elegantLook": "Элегантный Образ"
+  },
+  "timeAgo": {
+    "daysAgo19": "19 дней назад",
+    "daysAgo2": "2 дня назад",
+    "daysAgo5": "5 дней назад",
+    "weekAgo1": "1 неделю назад"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "stories": {
+    "virtualTryOn": "Prueba Cualquier Atuendo en Segundos",
+    "styleCloset": "Diseña Tu Armario",
+    "aiPhotoEditor": "Editor de Fotos IA: Cambiar Estilo",
+    "yourOutfits": "Tus Atuendos"
+  },
+  "outfitCards": {
+    "cherryWall": "Pared de Cereza",
+    "newOutfit": "Nuevo Atuendo",
+    "casualStyle": "Estilo Casual",
+    "elegantLook": "Look Elegante"
+  },
+  "timeAgo": {
+    "daysAgo19": "hace 19 días",
+    "daysAgo2": "hace 2 días", 
+    "daysAgo5": "hace 5 días",
+    "weekAgo1": "hace 1 semana"
+  }
+} 

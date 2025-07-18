@@ -1,0 +1,20 @@
+{
+  "stories": {
+    "virtualTryOn": "Prova Qualsiasi Outfit in Secondi",
+    "styleCloset": "Stilizza il Tuo Guardaroba",
+    "aiPhotoEditor": "Editor Foto AI: Cambia Stile",
+    "yourOutfits": "I Tuoi Outfit"
+  },
+  "outfitCards": {
+    "cherryWall": "Muro di Ciliegio",
+    "newOutfit": "Nuovo Outfit",
+    "casualStyle": "Stile Casual",
+    "elegantLook": "Look Elegante"
+  },
+  "timeAgo": {
+    "daysAgo19": "19 giorni fa",
+    "daysAgo2": "2 giorni fa",
+    "daysAgo5": "5 giorni fa",
+    "weekAgo1": "1 settimana fa"
+  }
+}
