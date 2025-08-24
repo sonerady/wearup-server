@@ -1252,7 +1252,7 @@ router.post("/generate", async (req, res) => {
 
     const replicateResponse = await got
       .post(
-        "https://api.replicate.com/v1/models/runwayml/gen4-image/predictions",
+        "https://api.replicate.com/v1/models/runwayml/gen4-image-turbo/predictions",
         {
           headers: {
             Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
