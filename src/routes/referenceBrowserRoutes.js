@@ -972,28 +972,11 @@ async function enhancePromptWithGemini(
       );
     }
 
-    // Prompt uzunluğunu kontrol et ve optimize et
-    if (enhancedPrompt.length > 500) {
-      console.warn(
-        "⚠️ [BACKEND GEMINI] PROMPT 500 KARAKTERİ AŞIYOR! Kısaltılması gerekiyor."
-      );
-      // Prompt'u kısalt
-      const shortPrompt = enhancedPrompt.substring(0, 497) + "...";
-      console.log("✂️ [BACKEND GEMINI] Kısaltılmış prompt:", shortPrompt);
-      return shortPrompt;
-    } else if (enhancedPrompt.length < 300) {
-      console.warn(
-        "⚠️ [BACKEND GEMINI] PROMPT 300 KARAKTERİN ALTINDA! Çok kısa, daha detaylı olmalı."
-      );
-      console.log(
-        "📏 [BACKEND GEMINI] Kısa prompt uzunluğu:",
-        enhancedPrompt.length
-      );
-    } else {
-      console.log(
-        "✅ [BACKEND GEMINI] Prompt uzunluğu ideal aralıkta (300-500 karakter)"
-      );
-    }
+    // Prompt uzunluk kontrolü kaldırıldı - Google Nano Banana için serbest uzunluk
+    console.log(
+      "📏 [BACKEND GEMINI] Google Nano Banana prompt uzunluğu:",
+      enhancedPrompt.length
+    );
 
     return enhancedPrompt;
   } catch (error) {

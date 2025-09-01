@@ -342,58 +342,65 @@ function formatAspectRatio(ratioStr) {
   }
 }
 
-// EditRoom için Gen4 @TAK prompt iyileştirme fonksiyonu
+// EditRoom için Google Nano Banana prompt iyileştirme fonksiyonu
 async function enhancePromptWithGemini(
   originalPrompt,
   referenceImageUrl,
   settings = {}
 ) {
   try {
-    console.log("Gemini ile Gen4 @TAK prompt iyileştirme başlatılıyor");
+    console.log(
+      "Gemini ile Google Nano Banana prompt iyileştirme başlatılıyor"
+    );
     console.log("Original prompt:", originalPrompt);
 
     // Gemini modeli
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Gen4 için kısa AI edit prompt talimatı
+    // Google Nano Banana için doğal dil prompt talimatı
     const promptForGemini = `
-You are creating a short AI edit prompt for Gen4 image editing. Look at the provided image and the user's request: "${originalPrompt}"
+You are creating a natural language prompt for Google Nano Banana image editing. Look at the provided image and the user's request: "${originalPrompt}"
 
 CRITICAL INSTRUCTIONS:
 
-🎯 ALWAYS USE @TAK REFERENCE:
-- MANDATORY: Always mention "@TAK" when referring to the person in the image
-- Example: "Give @TAK a gothic fashion style" or "Change @TAK's hair color to blonde"
+🎯 NATURAL LANGUAGE REFERENCE:
+- Refer to "the person in the photo" or "the model" or "the woman/man"
+- NO special tags like @TAK or @TOK - use natural language
+- Example: "Give the person a gothic fashion style" or "Change the woman's hair color to blonde"
 
-📏 KEEP IT SHORT AND FOCUSED:
-- Maximum 100 characters
+📏 KEEP IT CLEAR AND FOCUSED:
+- Maximum 200 characters
 - Single action, clear and specific
-- No unnecessary words or descriptions
+- Natural, conversational language
 - Focus on the main edit request only
 
 🔧 EDIT PROMPT STRUCTURE:
 - Start with action verb (Give/Change/Add/Remove/Make)
-- Always include "@TAK" reference
+- Refer to the person naturally
 - Specify the change clearly
 - Add "Keep everything else the same" if needed
 
 ✅ GOOD EXAMPLES:
-- "Give @TAK a gothic fashion style with dark makeup, accessories, and clothing. Keep her pose and background the same."
-- "Change @TAK's hair color to blonde. Keep everything else the same."
-- "Add sunglasses to @TAK. Keep pose and background the same."
+- "Give the person a gothic fashion style with dark makeup, accessories, and clothing. Keep the pose and background the same."
+- "Change the woman's hair color to blonde. Keep everything else the same."
+- "Add sunglasses to the person. Keep pose and background the same."
+- "Make the person wear a red dress instead of current outfit."
 
 ❌ AVOID:
+- Special tags like @TAK, @TOK
 - Long descriptions
 - Multiple changes in one prompt
-- Generic references like "the person" or "subject"
 - Unnecessary details about lighting, camera, etc.
 
 LANGUAGE: Always generate the prompt in English, translate any non-English words.
 
-Based on the user's request and the image, create a short Gen4 edit prompt that mentions @TAK and accomplishes exactly what they asked for.
+Based on the user's request and the image, create a natural language edit prompt that refers to the person in the photo and accomplishes exactly what they asked for.
     `;
 
-    console.log("Gemini'ye gönderilen Gen4 prompt talimatı:", promptForGemini);
+    console.log(
+      "Gemini'ye gönderilen Google Nano Banana prompt talimatı:",
+      promptForGemini
+    );
 
     // Resim verilerini içerecek parts dizisini hazırla
     const parts = [{ text: promptForGemini }];
@@ -432,7 +439,7 @@ Based on the user's request and the image, create a short Gen4 edit prompt that 
     let enhancedPrompt = result.response.text().trim();
 
     console.log(
-      "🤖 [BACKEND GEMINI] Gemini'nin ürettiği Gen4 @TAK prompt:",
+      "🤖 [BACKEND GEMINI] Gemini'nin ürettiği Google Nano Banana prompt:",
       enhancedPrompt
     );
 
@@ -717,18 +724,20 @@ router.post("/generate", async (req, res) => {
     console.log("📝 [BACKEND MAIN] Original prompt:", promptText);
     console.log("✨ [BACKEND MAIN] Enhanced prompt:", enhancedPrompt);
 
-    // Replicate Gen4 API'ye istek gönder - @TAK referansıyla (referenceBrowserRoutes.js formatında)
-    const gen4Input = {
+    // Replicate Google Nano Banana API'ye istek gönder
+    const nanoBananaInput = {
       prompt: enhancedPrompt,
-      aspect_ratio: formattedRatio,
-      reference_tags: ["TAK"],
-      reference_images: [referenceImageUrl],
+      image_input: [referenceImageUrl],
+      output_format: "jpg",
     };
 
-    console.log("🎯 Gen4 API'ye gönderilen input:", gen4Input);
+    console.log(
+      "🍌 Google Nano Banana API'ye gönderilen input:",
+      nanoBananaInput
+    );
 
     const replicateResponse = await got.post(
-      "https://api.replicate.com/v1/models/runwayml/gen4-image-turbo/predictions",
+      "https://api.replicate.com/v1/models/google/nano-banana/predictions",
       {
         headers: {
           Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
@@ -736,7 +745,7 @@ router.post("/generate", async (req, res) => {
           Prefer: "wait",
         },
         json: {
-          input: gen4Input,
+          input: nanoBananaInput,
         },
         responseType: "json",
       }
