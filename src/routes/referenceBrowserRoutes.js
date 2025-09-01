@@ -672,12 +672,17 @@ async function enhancePromptWithGemini(
       backgroundPromptSection = `
     
     BACKGROUND REQUIREMENTS (No location specified by user):
-    - KEEP the original background from the model image (preserve the existing setting)
-    - MAINTAIN the original lighting and atmosphere from the model's environment
-    - DO NOT change the background setting, location, or environment
-    - FOCUS on preserving the original backdrop while enhancing the overall look
-    - The background should remain exactly as it appears in the model reference image
-    - Only the clothing should change - background stays the same`;
+    - ANALYZE the clothing/products from the second image and SELECT an appropriate, beautiful location that complements the style
+    - CHOOSE a background setting that enhances and showcases the clothing perfectly
+    - CONSIDER the style, formality, and occasion of the clothing when selecting the location
+    - CREATE a cinematic, professional background that makes the outfit look stunning
+    - Examples: 
+      * Casual outfit → Modern urban street, cozy café, park setting
+      * Formal wear → Elegant hotel lobby, sophisticated restaurant, upscale venue
+      * Sporty clothes → Modern gym, outdoor athletic setting, contemporary fitness space
+      * Evening wear → Luxury lounge, elegant ballroom, sophisticated nighttime setting
+    - DESCRIBE the chosen location in rich, atmospheric detail with professional lighting
+    - ENSURE the background complements rather than competes with the clothing`;
     } else {
       backgroundPromptSection = `
     
@@ -841,7 +846,7 @@ async function enhancePromptWithGemini(
       - Include professional photography elements: lighting, setting, mood, composition, camera work
       - ${
         !hasLocation
-          ? "KEEP the original background from model image unchanged but describe it in cinematic detail"
+          ? "SELECT and describe a beautiful, appropriate background location that complements the clothing style"
           : "EXPAND the location setting into a detailed, atmospheric description"
       }
       - Write flowing, sophisticated descriptions that paint a complete picture
@@ -865,7 +870,7 @@ async function enhancePromptWithGemini(
       - Natural language without special tags - use sophisticated editorial writing
       - For background: ${
         !hasLocation
-          ? "keep the original background from model image unchanged but describe it cinematically"
+          ? "select and describe a beautiful, appropriate location that complements the clothing style"
           : "use the specified location with detailed atmospheric description"
       }
       - Think: "person from first image wearing ALL NEW product(s) from second image in detailed background setting"
