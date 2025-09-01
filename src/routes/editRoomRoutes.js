@@ -357,44 +357,66 @@ async function enhancePromptWithGemini(
     // Gemini modeli
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Google Nano Banana için doğal dil prompt talimatı
+    // Google Nano Banana için detaylı doğal dil prompt talimatı
     const promptForGemini = `
-You are creating a natural language prompt for Google Nano Banana image editing. Look at the provided image and the user's request: "${originalPrompt}"
+You are creating a comprehensive, detailed natural language prompt for Google Nano Banana image editing. Look at the provided image and the user's request: "${originalPrompt}"
 
 CRITICAL INSTRUCTIONS:
 
 🎯 NATURAL LANGUAGE REFERENCE:
-- Refer to "the person in the photo" or "the model" or "the woman/man"
-- NO special tags like @TAK or @TOK - use natural language
-- Example: "Give the person a gothic fashion style" or "Change the woman's hair color to blonde"
+- Refer to "the person in the photo" or "the model" or "the woman/man" naturally
+- NO special tags - use sophisticated, editorial language
+- Example: "Transform the person's style to gothic fashion" or "Give the woman blonde hair with natural highlights"
 
-📏 KEEP IT CLEAR AND FOCUSED:
-- Maximum 200 characters
-- Single action, clear and specific
-- Natural, conversational language
-- Focus on the main edit request only
+📝 CREATE DETAILED, COMPREHENSIVE DESCRIPTIONS:
+- NO length restrictions - be as detailed as possible
+- Write rich, descriptive language that paints a vivid picture
+- Include specific details about colors, textures, styles, and atmosphere
+- Use professional fashion and photography terminology
+- Create cinematic, editorial-quality descriptions
 
-🔧 EDIT PROMPT STRUCTURE:
-- Start with action verb (Give/Change/Add/Remove/Make)
-- Refer to the person naturally
-- Specify the change clearly
-- Add "Keep everything else the same" if needed
+🔧 DETAILED EDIT PROMPT STRUCTURE:
+- Start with clear action (Transform/Change/Give/Add/Create/Make)
+- Refer to the person using natural, sophisticated language
+- Provide extensive, specific details about the desired changes
+- Include atmospheric and styling context
+- Add lighting, mood, and background considerations
+- Specify how changes should look and feel
 
-✅ GOOD EXAMPLES:
-- "Give the person a gothic fashion style with dark makeup, accessories, and clothing. Keep the pose and background the same."
-- "Change the woman's hair color to blonde. Keep everything else the same."
-- "Add sunglasses to the person. Keep pose and background the same."
-- "Make the person wear a red dress instead of current outfit."
+✅ COMPREHENSIVE EXAMPLES:
+- "Transform the person into a sophisticated gothic fashion style featuring dramatic dark makeup with smoky charcoal eyeshadow, deep burgundy lipstick, and subtle contouring, complemented by elegant black clothing with intricate lace details, velvet textures, and silver metallic accents, while maintaining their natural pose and expression in a moody, atmospheric setting with soft dramatic lighting"
+- "Give the woman luxurious blonde hair with natural golden highlights, featuring soft waves that cascade gracefully over her shoulders, with subtle honey-toned undertones that catch the light beautifully, while preserving her facial features, pose, and the existing background atmosphere"
+- "Add sophisticated designer sunglasses with a sleek black frame and gradient lenses to the person, ensuring they complement their facial structure and overall style, while maintaining the original lighting and background setting"
+
+🎨 ADVANCED STYLING INTEGRATION:
+- Analyze the person's current style and build upon it
+- Consider skin tone, hair color, and facial features when making suggestions
+- Ensure changes feel natural and harmonious
+- Include details about how modifications interact with lighting
+- Describe textures, materials, and finishes in detail
+- Consider the overall mood and atmosphere of the image
+
+🌟 ATMOSPHERIC DETAILS:
+- Include appropriate lighting descriptions (natural, dramatic, soft, etc.)
+- Consider background harmony and complementary settings
+- Add mood and emotional context to the changes
+- Describe how the modifications enhance the overall aesthetic
+- Include professional photography elements
 
 ❌ AVOID:
-- Special tags like @TAK, @TOK
-- Long descriptions
-- Multiple changes in one prompt
-- Unnecessary details about lighting, camera, etc.
+- Rushed or superficial descriptions
+- Generic or vague language
+- Multiple unrelated changes in one prompt
+- Overly technical camera terminology
 
-LANGUAGE: Always generate the prompt in English, translate any non-English words.
+LANGUAGE REQUIREMENTS:
+- Always generate prompts in sophisticated English
+- Translate any non-English terms to English
+- Use editorial fashion vocabulary
+- Write with descriptive, artistic flair
+- Maintain professional, upscale tone
 
-Based on the user's request and the image, create a natural language edit prompt that refers to the person in the photo and accomplishes exactly what they asked for.
+Based on the user's request and the image analysis, create a comprehensive, detailed natural language edit prompt that describes exactly what they want with rich, descriptive detail and sophisticated styling context.
     `;
 
     console.log(
