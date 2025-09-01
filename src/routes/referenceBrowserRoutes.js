@@ -614,53 +614,43 @@ async function enhancePromptWithGemini(
     USER SELECTED DETAILED SETTINGS:
     ${settingsDescriptions.join("\n    ")}
 
-     FLUX KONTEXT PROMPT OPTIMIZATION (CRITICAL FOR BEST RESULTS):
+     GOOGLE NANO BANANA DETAILED PROMPT CREATION:
     
-    You are generating a prompt for FLUX Kontext, a surgical image editing model. Follow these MANDATORY guidelines:
+    You are generating a detailed, comprehensive prompt for Google Nano Banana image generation model. NO TOKEN LIMITS - be as detailed as possible!
     
-    🔧 PROMPT STRUCTURE (EXACTLY 3 CLAUSES):
-    1) [MAIN_ACTION] - Start with precise action verb (Replace) + specific target
-    2) [PRESERVE] - "while keeping" + ALL elements that must remain unchanged
-    3) [DETAILS] - Camera, lighting, style refinements, scene context
+    🎯 PROMPT STRUCTURE (NATURAL DESCRIPTIVE LANGUAGE):
+    - Write a flowing, natural description in conversational English
+    - NO special syntax, tags, or rigid structures required
+    - Focus on rich, detailed descriptions of clothing and styling
+    - Include comprehensive details about ALL products visible in the product image
     
-    📏 CRITICAL LIMITS:
-    - MAXIMUM 512 tokens (Kontext will cut off longer prompts)
-    - ONE flowing sentence with semicolons separating the 3 clauses
-    - NO line breaks or multiple sentences
+    📝 DETAILED PRODUCT DESCRIPTION REQUIREMENTS:
+    - MANDATORY: Describe EVERY SINGLE ITEM visible in the product image
+    - If multiple products shown: Detail each item individually AND how they work together
+    - Include specific details: colors, patterns, textures, fabric types, cuts, fits, styling elements
+    - Mention construction details: buttons, zippers, seams, hemlines, necklines, sleeves
+    - Describe how fabrics drape, move, catch light, and their visual/tactile qualities
+    - Include styling context: occasion appropriateness, seasonal suitability, fashion category
     
-    🎯 ACTION VERBS (Use these proven high-impact verbs):
-    - Change (for color, material, style modifications)
-    - Transform (for style transfers)
-    - Replace (for object substitution)
-    - Add (for new elements)
-    - Remove (for deletions)
-    
-    🛡️ PRESERVE CLAUSE (NEVER OMIT):
-    Essential to prevent unwanted artifacts. Always include "while keeping" + specify:
-    - Pose and body positioning
-    - Facial features and expression
-    - Background elements
-    - Lighting conditions
-    - All original garment details not being changed
-    - Construction, fit, and proportions
-    
-    IMPORTANT INSTRUCTION: Generate ONLY a single, flowing FLUX Kontext prompt following the 3-clause structure. Do not include explanations, introductions, or commentary. The prompt should be surgical and specific, not descriptive scene creation.
+    🎨 COMPREHENSIVE STYLING INTEGRATION:
+    - MANDATORY: Incorporate ALL user settings into detailed descriptions
+    - Expand location/environment settings into atmospheric scene descriptions
+    - Apply weather/season settings for appropriate styling and ambiance
+    - Include detailed physical characteristics (age, gender, ethnicity, skin tone, body shape)
+    - Specify hair settings (style and color) with detailed descriptions
+    - Apply mood and pose settings for expression and body language
+    - Integrate camera perspective and lighting preferences
+    - Include accessories as complementary styling elements
+    - Apply product color modifications with detailed color descriptions
+    - Weave in additional custom details naturally throughout the description
 
-    LANGUAGE NORMALIZATION RULES:
-    - Translate every word and phrase that is not in English (e.g., colors, locations, garment descriptors) into English in the generated prompt. Example: convert "beyaz studio" to "white studio". The final prompt MUST be entirely in English.
-    
-    SETTINGS INTEGRATION REQUIREMENTS:
-    - MANDATORY: Incorporate ALL the above user settings into the final description
-    - Apply location/environment settings for background and lighting
-    - Apply weather/season settings for appropriate atmosphere and clothing interaction
-    - Apply physical characteristics (age, gender, ethnicity, skin tone, body shape) accurately
-    - Apply hair settings (style and color) precisely
-    - Apply mood and pose settings for expression and posture
-    - Apply camera perspective settings for the photography angle
-    - Apply accessories settings as additional items worn by the model
-    - Apply product color settings to modify the garment colors as specified
-    - Apply additional details for extra customization
-    - Ensure all settings work harmoniously together for a cohesive look`;
+    LANGUAGE AND STYLE REQUIREMENTS:
+    - Write in sophisticated, editorial fashion language
+    - Use rich, descriptive vocabulary that paints a vivid picture
+    - Translate any non-English terms to English
+    - Focus on craftsmanship, quality, and styling excellence
+    - Create a cohesive narrative that flows naturally
+    - NO length restrictions - be comprehensively detailed`;
 
         console.log("📝 [BACKEND GEMINI] Settings descriptions hazırlandı:");
         settingsDescriptions.forEach((desc, index) => {
@@ -682,22 +672,22 @@ async function enhancePromptWithGemini(
       backgroundPromptSection = `
     
     BACKGROUND REQUIREMENTS (No location specified by user):
-    6. KEEP the original background from @TAK model image (preserve the existing setting)
-    7. MAINTAIN the original lighting and atmosphere from @TAK model's environment
-    8. DO NOT change the background setting, location, or environment
-    9. FOCUS on preserving the original backdrop while enhancing the overall look
-    10. The background should remain exactly as it appears in the @TAK reference image
-    11. Only the clothing should change - background stays the same`;
+    - KEEP the original background from the model image (preserve the existing setting)
+    - MAINTAIN the original lighting and atmosphere from the model's environment
+    - DO NOT change the background setting, location, or environment
+    - FOCUS on preserving the original backdrop while enhancing the overall look
+    - The background should remain exactly as it appears in the model reference image
+    - Only the clothing should change - background stays the same`;
     } else {
       backgroundPromptSection = `
     
     BACKGROUND NOTE (User specified location settings):
-    6. USER HAS SPECIFIED LOCATION: "${settings.location}" - EXPAND this into a detailed, atmospheric description
-    7. DON'T just write "${settings.location}" - describe the environment in cinematic detail
-    8. Example: "desert_sunset" → "breathtaking desert landscape during golden sunset hour with warm orange and pink hues painting the sky, sand dunes creating dramatic shadows, and soft golden light"
-    9. Focus on making the specified location look professional, photogenic, and visually rich
-    10. Ensure lighting and atmosphere match the location and complement the overall look
-    11. Use descriptive, evocative language to bring the location to life`;
+    - USER HAS SPECIFIED LOCATION: "${settings.location}" - EXPAND this into a detailed, atmospheric description
+    - DON'T just write "${settings.location}" - describe the environment in cinematic detail
+    - Example: "desert_sunset" → "breathtaking desert landscape during golden sunset hour with warm orange and pink hues painting the sky, sand dunes creating dramatic shadows, and soft golden light"
+    - Focus on making the specified location look professional, photogenic, and visually rich
+    - Ensure lighting and atmosphere match the location and complement the overall look
+    - Use descriptive, evocative language to bring the location to life`;
     }
 
     // Gemini'ye gönderilecek metin (Google Nano Banana formatında)
@@ -718,44 +708,43 @@ async function enhancePromptWithGemini(
     ${backgroundPromptSection}
     
     🎯 GOOGLE NANO BANANA MODEL REQUIREMENTS:
-    You will create a prompt for the Google Nano Banana model that uses reference images.
+    You will create a comprehensive, detailed prompt for the Google Nano Banana model using reference images.
     
                 REFERENCE SYSTEM:
       - FIRST IMAGE = The model/person - PERSON/POSE REFERENCE ONLY - IGNORE ALL CLOTHING ON THIS MODEL
-      - SECOND IMAGE = The clothing/product - THIS IS THE NEW CLOTHING TO BE DESCRIBED
+      - SECOND IMAGE = The clothing/product - THIS IS THE NEW CLOTHING TO BE DESCRIBED IN DETAIL
       
       🚨🚨 CRITICAL INSTRUCTIONS FOR NANO BANANA 🚨🚨:
       
       ⚠️ EXTREMELY IMPORTANT: THE MODEL IS WEARING SOME CLOTHING BUT YOU MUST COMPLETELY IGNORE IT!
       
       - FIRST IMAGE: Shows a person - USE ONLY for body type, pose, and stance
-      - SECOND IMAGE: Shows the NEW clothing/product that you MUST describe in detail
+      - SECOND IMAGE: Shows the NEW clothing/product that you MUST describe in comprehensive detail
       - The model's current outfit is IRRELEVANT and must NOT be mentioned
-      - 🚫 NEVER describe leopard print, dresses, or any clothing visible on the model
+      - 🚫 NEVER describe any clothing visible on the model in the first image
       - 🚫 NEVER mention the model's existing outfit, regardless of what it looks like
-      - ✅ ONLY describe the product clothing in extreme detail
-      - ✅ The product clothing is completely different from what the model is wearing
-      - Focus: person/pose from first image wearing new product from second image
+      - ✅ ONLY describe the product clothing from the second image in extensive detail
+      - ✅ Focus: person/pose from first image wearing new product(s) from second image
     
-        🎯 PROMPT STRUCTURE: Create a VERY detailed 400-500 character natural sentence.
+        🎯 PROMPT STRUCTURE: Create a COMPREHENSIVE, DETAILED natural description with NO length restrictions.
     
           CORE REQUIREMENTS FOR NANO BANANA:
       1. Use the FIRST image for the person/pose reference only
-      2. Use the SECOND image for the NEW clothing to be worn
-      3. TARGET LENGTH: 400-500 characters (concise but detailed!)
+      2. Use the SECOND image for the NEW clothing to be described in full detail
+      3. NO LENGTH LIMITS - be as detailed and comprehensive as possible!
       4. NEVER describe model's current clothing - only reference person/pose
       5. EXPAND ALL SETTINGS INTO DETAILED DESCRIPTIONS (don't just copy keywords)
-      6. COMPLETE the sentence properly - don't cut off in the middle
-      7. NO special tags like @TAK or @TOK - just natural description
+      6. Write naturally flowing, editorial-style descriptions
+      7. NO special tags - use natural, conversational language
     
           EXAMPLE FORMAT:
-      "A [person description from first image] wearing [extensive detailed description of the new clothing from second image including colors, materials, textures, cut, style, design elements], photographed in [detailed lighting and setting description]"
+      "A [person description from first image] wearing [COMPREHENSIVE, DETAILED description of ALL new clothing from second image including specific colors, materials, textures, cuts, styles, design elements, and construction details], photographed in [detailed lighting and setting description]"
     
-          DETAILED EXAMPLE (400-500 characters):
-      "A confident woman wearing a luxurious cream cashmere sweater with intricate cable-knit pattern, oversized fit with dropped shoulders and ribbed crew neckline, paired with high-waisted navy tailored trousers featuring elegant wide-leg silhouette, captured in soft natural lighting with warm golden hour ambiance that enhances the fabric textures and creates a sophisticated editorial atmosphere"
+          COMPREHENSIVE EXAMPLE (NO LENGTH RESTRICTIONS):
+      "A confident woman with elegant posture wearing a luxurious cream-colored cashmere blend sweater featuring an intricate diamond-pattern cable knit construction with subtle texture variations, showcasing an oversized relaxed fit with dramatically dropped shoulders, ribbed crew neckline with contrast edging detail, and three-quarter length sleeves with rolled cuffs, paired seamlessly with high-waisted navy blue tailored wool trousers featuring a sophisticated wide-leg silhouette with pressed creases, hidden side zip closure, and subtle pinstripe pattern woven throughout the fabric, complemented by a soft blush pink leather structured handbag with polished gold hardware and adjustable chain strap, delicate 14k gold geometric bracelet, and white canvas sneakers with premium leather trim and rubber soles, creating a perfectly balanced ensemble that combines casual comfort with refined urban sophistication, captured in soft natural lighting during golden hour with warm amber tones filtering through the scene, creating gentle shadows and highlighting the rich textures of each garment while maintaining a sophisticated editorial atmosphere"
     
-          DETAILED EXAMPLE (Multiple Items - 400-500 characters):
-      "A stylish model wearing a coordinated ensemble featuring a soft coral striped knit sweater with cream and orange horizontal stripes, paired with high-waisted navy pinstripe wide-leg trousers and delicate gold accessories, captured in golden hour lighting with warm atmospheric ambiance"
+          MULTIPLE PRODUCTS EXAMPLE (COMPREHENSIVE DETAIL):
+      "A stylish model wearing a coordinated ensemble featuring a soft coral striped knit sweater with cream and vibrant orange horizontal stripes in varying widths, ribbed crew neckline with reinforced stitching, relaxed oversized fit construction in premium cotton blend with subtle stretch, paired with high-waisted navy blue and white vertical pinstripe wide-leg trousers featuring classic tailored silhouette with flowing drape and elegant movement, complemented by essential accessories including delicate 14k gold charm bracelet with intricate geometric detailing, classic tortoiseshell acetate sunglasses with gradient amber lenses, soft blush pink leather structured handbag with polished gold hardware, and white canvas sneakers with leather trim - each item working harmoniously to create a cohesive spring-summer look that perfectly balances casual comfort with refined sophistication"
     
           🚨 WRONG EXAMPLE (WHAT NOT TO DO):
       "A woman wearing leopard print midi dress..." ← THIS IS WRONG! This describes model's current outfit, not the product
@@ -767,17 +756,18 @@ async function enhancePromptWithGemini(
       - Natural language without special tags
     
     CRITICAL CLOTHING ANALYSIS RULES:
-    🚫 DO NOT describe any clothing currently on the model
+    🚫 DO NOT describe any clothing currently on the model in the first image
     🚫 DO NOT mention model's existing outfit, dress, shirt, pants, etc.
-    ✅ ONLY describe the product clothing in extreme detail
-    ✅ DESCRIBE EVERY SINGLE ITEM visible in product image (multiple products if present)
-    ✅ If product shows multiple items: describe each one with specific details
-    ✅ Include: colors, patterns, textures, fabric types, weave, finish
-    ✅ Mention: design elements, buttons, zippers, cuts, silhouettes, fit
-    ✅ Describe: style category, seasonal use, occasion appropriateness
-    ✅ Note: unique features, embellishments, construction details, drape
-    ✅ Include: how the fabric moves, catches light, styling versatility
-    ✅ For outfit combinations: describe how items work together as a cohesive look
+    ✅ MANDATORY: DESCRIBE EVERY SINGLE ITEM visible in the product image in comprehensive detail
+    ✅ If multiple products shown: Detail each item individually AND explain how they work together as a complete outfit
+    ✅ Include extensive details: specific colors, intricate patterns, fabric textures, material composition
+    ✅ Mention construction elements: buttons, zippers, seams, hemlines, necklines, sleeve details, closures
+    ✅ Describe fit and silhouette: how garments drape, move, and complement the body
+    ✅ Note styling elements: occasion appropriateness, seasonal context, fashion category, styling versatility
+    ✅ Include unique features: embellishments, decorative elements, brand characteristics, special finishes
+    ✅ Describe fabric qualities: how materials catch light, their weight, texture, and visual appeal
+    ✅ For complete outfits: Explain how each piece complements others, color coordination, style harmony
+    ✅ CRITICAL: If the product image shows multiple clothing items or accessories, you MUST describe each one in detail and explain how they create a cohesive styled look together
     
     ADDITIONAL SCENE DETAILS FOR NANO BANANA:
     - Include specific lighting descriptions (natural, studio, golden hour, etc.)
@@ -831,7 +821,7 @@ async function enhancePromptWithGemini(
     - Maintain editorial magazine sophistication
     
     OUTPUT FORMAT FOR NANO BANANA:
-    Create a single, detailed sentence (400-500 characters) that naturally describes the scene. Write it as if you're describing a professional fashion photo shoot${
+    Create a comprehensive, detailed natural description that captures every aspect of the styled look. Write it as if you're describing a professional fashion photo shoot for a high-end editorial magazine${
       !hasLocation
         ? ", keeping the original background from the model image but describing it in cinematic detail"
         : ""
@@ -839,47 +829,48 @@ async function enhancePromptWithGemini(
       hasValidSettings
         ? ". EXPAND all user style preferences into detailed, atmospheric descriptions (don't just copy keywords)"
         : ""
-    }. Use available characters efficiently to create a visually rich, cinematic prompt.
+    }. NO LENGTH RESTRICTIONS - be as detailed and comprehensive as possible to create a visually rich, cinematic prompt.
     
           🚨 CRITICAL REQUIREMENTS:
-      - TARGET LENGTH: 400-500 characters (concise but detailed!)
-      - Natural language without special tags (@TAK, @TOK)
-      - NEVER mention model's current clothing - only person/pose reference
-      - EXTENSIVELY describe product clothing: materials, colors, textures, construction, fit, style, details
-      - DESCRIBE EVERY SINGLE ITEM visible in product image (if multiple items present)
+      - NO LENGTH LIMITS - write comprehensive, detailed descriptions
+      - Natural language without special tags - use editorial fashion writing style
+      - NEVER mention model's current clothing - only reference person/pose from first image
+      - MANDATORY: EXTENSIVELY describe ALL product clothing from second image - materials, colors, textures, construction, fit, style, every detail
+      - CRITICAL: DESCRIBE EVERY SINGLE ITEM visible in product image (if multiple items present, detail each one)
       - EXPAND ALL USER SETTINGS into detailed, cinematic descriptions (don't just copy keywords)
-      - Include professional photography elements: lighting, setting, mood, composition
+      - Include professional photography elements: lighting, setting, mood, composition, camera work
       - ${
         !hasLocation
-          ? "KEEP the original background from model image unchanged but describe it in detail"
+          ? "KEEP the original background from model image unchanged but describe it in cinematic detail"
           : "EXPAND the location setting into a detailed, atmospheric description"
       }
-      - USE AVAILABLE CHARACTERS (400-500) efficiently to create a visually rich, detailed prompt
-      - COMPLETE the sentence properly - don't cut off mid-word or mid-phrase
+      - Write flowing, sophisticated descriptions that paint a complete picture
+      - ENSURE COMPLETE SENTENCES - finish thoughts properly, don't cut off mid-description
     
-          🚨 FINAL REMINDER: Output should be a single, DETAILED natural sentence describing person from first image wearing new clothing from second image. Target 400-500 characters and EXPAND all settings into detailed descriptions!
+          🚨 FINAL REMINDER: Create a COMPREHENSIVE, DETAILED natural description of the person from first image wearing ALL new clothing from second image. NO LENGTH RESTRICTIONS - be as detailed as possible and EXPAND all settings into rich, descriptive language!
       
       🚨 CRITICAL COMPLETION REQUIREMENT:
-      - The prompt MUST be a COMPLETE sentence that ends naturally
-      - Do NOT cut off in the middle like "captured with professional fash..."
-      - FINISH the sentence properly even if it means slightly fewer characters
-      - Better to have 450 complete characters than 500 incomplete ones
-      - End with proper photography/lighting/atmosphere description
-      - Example endings: "...captured with professional fashion photography techniques" or "...in soft natural lighting"
+      - Write COMPLETE, flowing descriptions that capture every detail
+      - Do NOT cut off mid-sentence or mid-thought
+      - FINISH all descriptions properly with complete thoughts
+      - Write comprehensive, editorial-quality descriptions
+      - End with complete photography/lighting/atmosphere descriptions
+      - Example endings: "...captured with professional fashion photography techniques highlighting every fabric detail" or "...photographed in soft natural lighting that enhances the rich textures and sophisticated styling"
     
           🚨🚨 LAST CRITICAL CHECK BEFORE WRITING:
       - Look at the first image - ignore ALL clothing on this model, use only person/pose reference
-      - Look at the second image - describe EVERY SINGLE ITEM visible in detail
+      - Look at the second image - describe EVERY SINGLE ITEM visible in comprehensive detail
       - The model's outfit is NOT what you should describe
-      - The product(s) are what you MUST describe (if multiple items, describe each one)
-      - Natural language without special tags
+      - The product(s) from second image are what you MUST describe in full detail (if multiple items, describe each one extensively)
+      - Natural language without special tags - use sophisticated editorial writing
       - For background: ${
         !hasLocation
-          ? "keep the original background from model image unchanged"
-          : "use the specified location"
+          ? "keep the original background from model image unchanged but describe it cinematically"
+          : "use the specified location with detailed atmospheric description"
       }
-      - Think: "person from first image wearing NEW product(s) from second image in original/specified background"
-      - FINISH the prompt as a complete sentence - don't cut off mid-word
+      - Think: "person from first image wearing ALL NEW product(s) from second image in detailed background setting"
+      - CRITICAL: If multiple clothing items/accessories shown in product image, describe each one and how they work together
+      - Write complete, comprehensive descriptions - no length limits
     `;
 
     console.log(
@@ -1081,7 +1072,7 @@ async function pollReplicateResult(predictionId, maxAttempts = 60) {
 // Ana generate endpoint'i
 router.post("/generate", async (req, res) => {
   // Kredi kontrolü ve düşme (V2'den eklendi)
-  const CREDIT_COST = 20; // Her oluşturma 20 kredi
+  const CREDIT_COST = 10; // Her oluşturma 20 kredi
   let creditDeducted = false;
   let userId; // Scope için önceden tanımla
 
