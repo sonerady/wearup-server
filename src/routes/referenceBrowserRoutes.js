@@ -700,15 +700,15 @@ async function enhancePromptWithGemini(
     11. Use descriptive, evocative language to bring the location to life`;
     }
 
-    // Gemini'ye gönderilecek metin (Gen4 Image formatında)
+    // Gemini'ye gönderilecek metin (Google Nano Banana formatında)
     let promptForGemini = `
     🚨🚨 CRITICAL WARNING: THE MODEL IS WEARING CLOTHING BUT YOU MUST IGNORE IT COMPLETELY! 🚨🚨
     
-    Create a detailed Gen4 Image model prompt based on this original user input: "${originalPrompt}"
+    Create a detailed Google Nano Banana model prompt based on this original user input: "${originalPrompt}"
     
     ⚠️ IMPORTANT: You will see two images:
-    1. A MODEL (@TAK) wearing some outfit - COMPLETELY IGNORE what they're wearing
-    2. A PRODUCT (@TOK) - This is the NEW clothing you must describe in detail
+    1. A MODEL image wearing some outfit - COMPLETELY IGNORE what they're wearing
+    2. A PRODUCT image - This is the NEW clothing you must describe in detail
     
     🚫 FORBIDDEN: Describing ANY clothing visible on the model
     ✅ REQUIRED: Describing ONLY the product clothing
@@ -717,60 +717,61 @@ async function enhancePromptWithGemini(
     
     ${backgroundPromptSection}
     
-    🎯 GEN4 IMAGE MODEL REQUIREMENTS:
-    You will create a prompt for the Gen4 Image model that uses reference tags and images.
+    🎯 GOOGLE NANO BANANA MODEL REQUIREMENTS:
+    You will create a prompt for the Google Nano Banana model that uses reference images.
     
                 REFERENCE SYSTEM:
-      - @TAK = The model/person (from the second reference image) - PERSON/POSE REFERENCE ONLY - IGNORE ALL CLOTHING ON THIS MODEL
-      - @TOK = The clothing/product (from the third reference image) - THIS IS THE NEW CLOTHING TO BE DESCRIBED
+      - FIRST IMAGE = The model/person - PERSON/POSE REFERENCE ONLY - IGNORE ALL CLOTHING ON THIS MODEL
+      - SECOND IMAGE = The clothing/product - THIS IS THE NEW CLOTHING TO BE DESCRIBED
       
-      🚨🚨 CRITICAL INSTRUCTIONS FOR GEN4 IMAGE 🚨🚨:
+      🚨🚨 CRITICAL INSTRUCTIONS FOR NANO BANANA 🚨🚨:
       
-      ⚠️ EXTREMELY IMPORTANT: THE @TAK MODEL IS WEARING SOME CLOTHING BUT YOU MUST COMPLETELY IGNORE IT!
+      ⚠️ EXTREMELY IMPORTANT: THE MODEL IS WEARING SOME CLOTHING BUT YOU MUST COMPLETELY IGNORE IT!
       
-      - @TAK IMAGE: Shows a person - USE ONLY for body type, pose, and stance
-      - @TOK IMAGE: Shows the NEW clothing/product that you MUST describe in detail
-      - The @TAK model's current outfit is IRRELEVANT and must NOT be mentioned
-      - 🚫 NEVER describe leopard print, dresses, or any clothing visible on @TAK model
+      - FIRST IMAGE: Shows a person - USE ONLY for body type, pose, and stance
+      - SECOND IMAGE: Shows the NEW clothing/product that you MUST describe in detail
+      - The model's current outfit is IRRELEVANT and must NOT be mentioned
+      - 🚫 NEVER describe leopard print, dresses, or any clothing visible on the model
       - 🚫 NEVER mention the model's existing outfit, regardless of what it looks like
-      - ✅ ONLY describe the @TOK product/clothing in extreme detail
-      - ✅ The @TOK clothing is completely different from what @TAK is wearing
-      - Focus: @TAK person/pose wearing @TOK new product (not current outfit)
+      - ✅ ONLY describe the product clothing in extreme detail
+      - ✅ The product clothing is completely different from what the model is wearing
+      - Focus: person/pose from first image wearing new product from second image
     
-        🎯 PROMPT STRUCTURE: Create a VERY detailed 950-1000 character sentence using @TAK and @TOK tags.
+        🎯 PROMPT STRUCTURE: Create a VERY detailed 400-500 character natural sentence.
     
-          CORE REQUIREMENTS FOR GEN4 IMAGE:
-      1. USE @TAK for the person/pose reference (NOT "@TAK body" - just "@TAK")
-      2. USE @TOK for the NEW clothing to be worn
-      3. TARGET LENGTH: 950-1000 characters (MAXIMIZE the character limit!)
-      4. NEVER describe @TAK's current clothing - only reference person/pose
+          CORE REQUIREMENTS FOR NANO BANANA:
+      1. Use the FIRST image for the person/pose reference only
+      2. Use the SECOND image for the NEW clothing to be worn
+      3. TARGET LENGTH: 400-500 characters (concise but detailed!)
+      4. NEVER describe model's current clothing - only reference person/pose
       5. EXPAND ALL SETTINGS INTO DETAILED DESCRIPTIONS (don't just copy keywords)
       6. COMPLETE the sentence properly - don't cut off in the middle
+      7. NO special tags like @TAK or @TOK - just natural description
     
           EXAMPLE FORMAT:
-      "@TAK wearing @TOK [extensive detailed description of the new clothing including colors, materials, textures, cut, style, design elements, fit, silhouette, fabric details, construction, seasonal appropriateness, styling elements], photographed in [detailed lighting and setting description with mood, atmosphere, and professional photography style]"
+      "A [person description from first image] wearing [extensive detailed description of the new clothing from second image including colors, materials, textures, cut, style, design elements], photographed in [detailed lighting and setting description]"
     
-          DETAILED EXAMPLE (Single Item - 950+ characters):
-      "@TAK wearing @TOK luxurious cashmere blend sweater in soft dusty rose color with intricate cable-knit pattern featuring diamond-shaped motifs, showcasing a relaxed oversized fit with dramatically dropped shoulders, ribbed crew neckline with subtle contrast edging, and subtly textured knit construction that catches light beautifully with a lustrous sheen, paired with the sweater's premium wool blend offering exceptional drape and fluid movement, complemented by delicate mother-of-pearl buttons along the side seam with matching interior grosgrain tape, fine merino wool blend that provides both exceptional warmth and breathability with temperature-regulating properties, perfectly suited for transitional seasons with versatile styling options, photographed in a breathtaking golden hour outdoor setting with warm amber light filtering through towering trees, creating soft romantic shadows and depth, captured with professional fashion photography techniques using shallow depth of field and cinematic composition that emphasizes both the garment's luxurious texture and the model's natural elegance"
+          DETAILED EXAMPLE (400-500 characters):
+      "A confident woman wearing a luxurious cream cashmere sweater with intricate cable-knit pattern, oversized fit with dropped shoulders and ribbed crew neckline, paired with high-waisted navy tailored trousers featuring elegant wide-leg silhouette, captured in soft natural lighting with warm golden hour ambiance that enhances the fabric textures and creates a sophisticated editorial atmosphere"
     
-          DETAILED EXAMPLE (Multiple Items - 950+ characters):
-      "@TAK wearing @TOK coordinated outfit ensemble featuring a soft coral striped knit sweater with cream and vibrant orange horizontal stripes in varying widths, ribbed crew neckline with reinforced stitching and relaxed oversized fit construction in premium cotton blend with subtle stretch, paired with high-waisted navy blue and white vertical pinstripe wide-leg trousers featuring classic tailored silhouette with flowing drape and elegant movement, complemented by delicate 14k gold charm bracelet with intricate geometric detailing and vintage-inspired elements, classic tortoiseshell acetate sunglasses with gradient amber lenses offering UV protection, soft blush pink leather structured handbag with polished gold hardware and adjustable chain strap, white canvas sneakers with leather trim and rubber soles, creating a cohesive spring-summer look that perfectly balances casual comfort with refined urban sophistication, photographed in a breathtaking desert landscape during golden sunset hour with warm orange and pink hues painting the dramatic sky, sand dunes creating elegant shadows, soft golden light illuminating the entire scene with cinematic warmth and natural beauty"
+          DETAILED EXAMPLE (Multiple Items - 400-500 characters):
+      "A stylish model wearing a coordinated ensemble featuring a soft coral striped knit sweater with cream and orange horizontal stripes, paired with high-waisted navy pinstripe wide-leg trousers and delicate gold accessories, captured in golden hour lighting with warm atmospheric ambiance"
     
           🚨 WRONG EXAMPLE (WHAT NOT TO DO):
-      "@TAK wearing @TOK leopard print midi dress..." ← THIS IS WRONG! This describes @TAK's current outfit, not @TOK product
+      "A woman wearing leopard print midi dress..." ← THIS IS WRONG! This describes model's current outfit, not the product
       
       🚨 CORRECT MINDSET:
-      - If @TAK shows a woman in a leopard dress, IGNORE the leopard dress completely
-      - If @TOK shows a pink sweater, describe ONLY the pink sweater in detail
-      - Think: "@TAK wearing @TOK [new product details]"
-      - Use "@TAK" not "@TAK body" - @TAK already represents the person
+      - If first image shows a woman in a leopard dress, IGNORE the leopard dress completely
+      - If second image shows a pink sweater, describe ONLY the pink sweater in detail
+      - Think: "person from first image wearing new product from second image"
+      - Natural language without special tags
     
     CRITICAL CLOTHING ANALYSIS RULES:
-    🚫 DO NOT describe any clothing currently on @TAK model
-    🚫 DO NOT mention @TAK's existing outfit, dress, shirt, pants, etc.
-    ✅ ONLY describe the @TOK clothing in extreme detail
-    ✅ DESCRIBE EVERY SINGLE ITEM visible in @TOK image (multiple products if present)
-    ✅ If @TOK shows multiple items: describe each one with specific details
+    🚫 DO NOT describe any clothing currently on the model
+    🚫 DO NOT mention model's existing outfit, dress, shirt, pants, etc.
+    ✅ ONLY describe the product clothing in extreme detail
+    ✅ DESCRIBE EVERY SINGLE ITEM visible in product image (multiple products if present)
+    ✅ If product shows multiple items: describe each one with specific details
     ✅ Include: colors, patterns, textures, fabric types, weave, finish
     ✅ Mention: design elements, buttons, zippers, cuts, silhouettes, fit
     ✅ Describe: style category, seasonal use, occasion appropriateness
@@ -778,7 +779,7 @@ async function enhancePromptWithGemini(
     ✅ Include: how the fabric moves, catches light, styling versatility
     ✅ For outfit combinations: describe how items work together as a cohesive look
     
-    ADDITIONAL SCENE DETAILS FOR GEN4 IMAGE:
+    ADDITIONAL SCENE DETAILS FOR NANO BANANA:
     - Include specific lighting descriptions (natural, studio, golden hour, etc.)
     - Add camera angle/perspective details (close-up, full body, portrait, etc.)
     - Mention background/setting that complements the style
@@ -788,18 +789,18 @@ async function enhancePromptWithGemini(
     SETTINGS INTEGRATION - EXPAND KEYWORDS INTO DETAILED DESCRIPTIONS:
     - DON'T just copy settings keywords (e.g. "desert_sunset") 
     - EXPAND settings into detailed, descriptive language
-    - Location "desert_sunset" → "photographed in a breathtaking desert landscape during golden sunset hour with warm orange and pink hues painting the sky, sand dunes creating dramatic shadows, and soft golden light illuminating the scene"
-    - Weather "snowy" → "captured in a winter wonderland with gentle snowflakes falling, creating a pristine white landscape with soft, diffused lighting and a serene atmosphere"
-    - Mood "confident" → "with a confident, empowered expression and strong, assured body language that radiates self-assurance"
-    - Use ALL available characters (950-1000) by expanding every detail
-    - Make the prompt cinematic and visually rich
+    - Location "desert_sunset" → "photographed in a breathtaking desert landscape during golden sunset hour"
+    - Weather "snowy" → "captured in a winter wonderland with gentle snowflakes falling"
+    - Mood "confident" → "with a confident, empowered expression"
+    - Use available characters (400-500) efficiently by expanding key details
+    - Make the prompt cinematic and visually rich but concise
     
     ${
       hasProductColor
         ? `
     IMPORTANT COLOR CUSTOMIZATION:
     - The user wants to modify the clothing color to: "${settings.productColor}"
-    - Apply this color ONLY to the main garment/product from the RIGHT side
+    - Apply this color ONLY to the main garment/product from the second image
     - Describe how this new color looks on the person
     - Ensure the color suits their overall appearance and styling
     `
@@ -829,55 +830,55 @@ async function enhancePromptWithGemini(
     - Focus on fabric quality, construction, and styling rather than body emphasis
     - Maintain editorial magazine sophistication
     
-    OUTPUT FORMAT FOR GEN4 IMAGE:
-    Create a single, EXTENSIVELY detailed sentence (950-1000 characters) that uses @TAK and @TOK tags to describe the scene. Write it as if you're describing a professional fashion photo shoot${
+    OUTPUT FORMAT FOR NANO BANANA:
+    Create a single, detailed sentence (400-500 characters) that naturally describes the scene. Write it as if you're describing a professional fashion photo shoot${
       !hasLocation
-        ? ", keeping the original background from @TAK model but describing it in cinematic detail"
+        ? ", keeping the original background from the model image but describing it in cinematic detail"
         : ""
     }${
       hasValidSettings
         ? ". EXPAND all user style preferences into detailed, atmospheric descriptions (don't just copy keywords)"
         : ""
-    }. USE EVERY AVAILABLE CHARACTER to create a visually rich, cinematic prompt.
+    }. Use available characters efficiently to create a visually rich, cinematic prompt.
     
           🚨 CRITICAL REQUIREMENTS:
-      - TARGET LENGTH: 950-1000 characters (MAXIMIZE the character limit!)
-      - Use "@TAK wearing @TOK" format (NOT "@TAK body wearing @TOK")
-      - NEVER mention @TAK's current clothing - only person/pose reference
-      - EXTENSIVELY describe @TOK clothing: materials, colors, textures, construction, fit, style, details
-      - DESCRIBE EVERY SINGLE ITEM visible in @TOK image (if multiple items present)
+      - TARGET LENGTH: 400-500 characters (concise but detailed!)
+      - Natural language without special tags (@TAK, @TOK)
+      - NEVER mention model's current clothing - only person/pose reference
+      - EXTENSIVELY describe product clothing: materials, colors, textures, construction, fit, style, details
+      - DESCRIBE EVERY SINGLE ITEM visible in product image (if multiple items present)
       - EXPAND ALL USER SETTINGS into detailed, cinematic descriptions (don't just copy keywords)
       - Include professional photography elements: lighting, setting, mood, composition
       - ${
         !hasLocation
-          ? "KEEP the original background from @TAK model unchanged but describe it in detail"
+          ? "KEEP the original background from model image unchanged but describe it in detail"
           : "EXPAND the location setting into a detailed, atmospheric description"
       }
-      - USE EVERY AVAILABLE CHARACTER (950-1000) to create a visually rich, detailed prompt
+      - USE AVAILABLE CHARACTERS (400-500) efficiently to create a visually rich, detailed prompt
       - COMPLETE the sentence properly - don't cut off mid-word or mid-phrase
     
-          🚨 FINAL REMINDER: Output should be a single, EXTENSIVELY DETAILED Gen4 Image prompt sentence using @TAK (person reference only) and @TOK (new clothing with complete details) tags. Target 950-1000 characters and EXPAND all settings into detailed descriptions!
+          🚨 FINAL REMINDER: Output should be a single, DETAILED natural sentence describing person from first image wearing new clothing from second image. Target 400-500 characters and EXPAND all settings into detailed descriptions!
       
       🚨 CRITICAL COMPLETION REQUIREMENT:
       - The prompt MUST be a COMPLETE sentence that ends naturally
       - Do NOT cut off in the middle like "captured with professional fash..."
       - FINISH the sentence properly even if it means slightly fewer characters
-      - Better to have 900 complete characters than 1000 incomplete ones
+      - Better to have 450 complete characters than 500 incomplete ones
       - End with proper photography/lighting/atmosphere description
-      - Example endings: "...captured with professional fashion photography techniques" or "...in soft natural lighting that enhances every detail"
+      - Example endings: "...captured with professional fashion photography techniques" or "...in soft natural lighting"
     
           🚨🚨 LAST CRITICAL CHECK BEFORE WRITING:
-      - Look at the first image (@TAK) - ignore ALL clothing on this model, use only person/pose reference
-      - Look at the second image (@TOK) - describe EVERY SINGLE ITEM visible in detail
-      - The @TAK model's outfit is NOT what you should describe
-      - The @TOK product(s) are what you MUST describe (if multiple items, describe each one)
-      - Use "@TAK wearing @TOK" format (NOT "@TAK body wearing @TOK")
+      - Look at the first image - ignore ALL clothing on this model, use only person/pose reference
+      - Look at the second image - describe EVERY SINGLE ITEM visible in detail
+      - The model's outfit is NOT what you should describe
+      - The product(s) are what you MUST describe (if multiple items, describe each one)
+      - Natural language without special tags
       - For background: ${
         !hasLocation
-          ? "keep the original background from @TAK unchanged"
+          ? "keep the original background from model image unchanged"
           : "use the specified location"
       }
-      - Think: "@TAK wearing NEW @TOK product(s) (not current outfit) in original/specified background"
+      - Think: "person from first image wearing NEW product(s) from second image in original/specified background"
       - FINISH the prompt as a complete sentence - don't cut off mid-word
     `;
 
@@ -972,17 +973,17 @@ async function enhancePromptWithGemini(
     }
 
     // Prompt uzunluğunu kontrol et ve optimize et
-    if (enhancedPrompt.length > 1000) {
+    if (enhancedPrompt.length > 500) {
       console.warn(
-        "⚠️ [BACKEND GEMINI] PROMPT 1000 KARAKTERİ AŞIYOR! Kısaltılması gerekiyor."
+        "⚠️ [BACKEND GEMINI] PROMPT 500 KARAKTERİ AŞIYOR! Kısaltılması gerekiyor."
       );
       // Prompt'u kısalt
-      const shortPrompt = enhancedPrompt.substring(0, 997) + "...";
+      const shortPrompt = enhancedPrompt.substring(0, 497) + "...";
       console.log("✂️ [BACKEND GEMINI] Kısaltılmış prompt:", shortPrompt);
       return shortPrompt;
-    } else if (enhancedPrompt.length < 800) {
+    } else if (enhancedPrompt.length < 300) {
       console.warn(
-        "⚠️ [BACKEND GEMINI] PROMPT 800 KARAKTERİN ALTINDA! Çok kısa, daha detaylı olmalı."
+        "⚠️ [BACKEND GEMINI] PROMPT 300 KARAKTERİN ALTINDA! Çok kısa, daha detaylı olmalı."
       );
       console.log(
         "📏 [BACKEND GEMINI] Kısa prompt uzunluğu:",
@@ -990,7 +991,7 @@ async function enhancePromptWithGemini(
       );
     } else {
       console.log(
-        "✅ [BACKEND GEMINI] Prompt uzunluğu ideal aralıkta (800-1000 karakter)"
+        "✅ [BACKEND GEMINI] Prompt uzunluğu ideal aralıkta (300-500 karakter)"
       );
     }
 
@@ -1241,18 +1242,17 @@ router.post("/generate", async (req, res) => {
     console.log("📝 [BACKEND MAIN] Original prompt:", promptText);
     console.log("✨ [BACKEND MAIN] Enhanced prompt:", enhancedPrompt);
 
-    // Replicate API'ye istek gönder - Gen4 Image modeli kullan
-    console.log("🔧 Gen4 Image API parametreleri:", {
+    // Replicate API'ye istek gönder - Google Nano Banana modeli kullan
+    console.log("🔧 Google Nano Banana API parametreleri:", {
       prompt: enhancedPrompt,
       prompt_length: enhancedPrompt.length,
-      aspect_ratio: formattedRatio,
-      reference_tags: ["TAK", "TOK"],
-      reference_images: [modelImage.uri, productImage.uri],
+      image_input: [modelImage.uri, productImage.uri],
+      output_format: "jpg",
     });
 
     const replicateResponse = await got
       .post(
-        "https://api.replicate.com/v1/models/runwayml/gen4-image-turbo/predictions",
+        "https://api.replicate.com/v1/models/google/nano-banana/predictions",
         {
           headers: {
             Authorization: `Bearer ${process.env.REPLICATE_API_TOKEN}`,
@@ -1262,9 +1262,8 @@ router.post("/generate", async (req, res) => {
           json: {
             input: {
               prompt: enhancedPrompt,
-              aspect_ratio: formattedRatio,
-              reference_tags: ["TAK", "TOK"],
-              reference_images: [modelImage.uri, productImage.uri],
+              image_input: [modelImage.uri, productImage.uri],
+              output_format: "jpg",
             },
           },
           responseType: "json",
@@ -1272,7 +1271,7 @@ router.post("/generate", async (req, res) => {
       )
       .catch((error) => {
         console.error(
-          "❌ Gen4 Image API detaylı hatası:",
+          "❌ Google Nano Banana API detaylı hatası:",
           error.response?.body || error.message
         );
         console.error("❌ Error status:", error.response?.statusCode);
