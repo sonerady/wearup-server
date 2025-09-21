@@ -9,7 +9,7 @@ const path = require("path");
 
 dotenv.config();
 
-const API_KEY = "68b5a5ed3d9970327b2446d2";
+const API_KEY = "68cf4281d592f35c3199242b";
 const SCRAPINGDOG_URL = "https://api.scrapingdog.com/google_shopping/";
 
 // Helper: data URI'yi decode edip sharp ile dönüştürür
