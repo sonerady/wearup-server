@@ -69,7 +69,7 @@ router.post(
       const imageData = fs.readFileSync(tempFilePath, { encoding: "base64" });
 
       // Gemini modeli (Gemini 1.5 Flash kullanılıyor)
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       // Prompt hazırlama - Gemini'ye hangi dilde yanıt vermesi gerektiğini söyle
       const prompt = `

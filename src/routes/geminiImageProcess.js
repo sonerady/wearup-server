@@ -71,7 +71,7 @@ async function generateEnhancedPrompt(
   generationConfig = {}
 ) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Create the prompt request with two parts: product details and photo enhancement instructions
     const promptRequest = {
@@ -268,7 +268,7 @@ router.post(
 
           // Use Gemini 2.0 Flash for processing both images
           const model = genAI.getGenerativeModel({
-            model: "gemini-1.5-flash-exp",
+            model: "gemini-2.5-flash-exp",
             generationConfig: {
               responseModalities: ["Text", "Image"],
               temperature: 1,

@@ -352,7 +352,7 @@ async function enhancePromptWithGemini(
     console.log("Gemini ile prompt iyileştirme başlatılıyor");
 
     // Gemini modeli
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Settings'in var olup olmadığını kontrol et
     const hasValidSettings =

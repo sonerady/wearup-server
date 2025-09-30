@@ -86,7 +86,7 @@ router.post("/analyze-clothing", upload.single("image"), async (req, res) => {
 
       // Use Gemini 1.5 Flash for analysis
       const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash",
       });
 
       // Prepare prompt for clothing item analysis
@@ -293,7 +293,7 @@ router.post("/analyze-clothing-url", async (req, res) => {
 
     // Use Gemini 1.5 Flash for analysis
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
     });
 
     // Prepare prompt for clothing item analysis
